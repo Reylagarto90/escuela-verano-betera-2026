@@ -315,6 +315,16 @@
         <label for="fotos-rrss">AUTORIZO a la empresa a hacer uso del material fotográfico y audiovisual de las actividades. Dicho material podrá ser publicado en redes sociales con el objetivo de promocionar la actividad.</label>
       </div>
 
+      <div class="form-group">
+        <label>Autorización para salidas del centro <span class="req">*</span></label>
+        <div class="radio-group" style="margin-top:8px">
+          <label class="radio-option"><input type="radio" name="salidas" value="si"> <span>AUTORIZO a que mi hijo/a salga de las instalaciones del centro acompañado/a por los monitores para la realización de actividades programadas en espacios exteriores próximos (parques, instalaciones deportivas municipales, etc.), siempre bajo la supervisión del personal responsable.</span></label>
+        </div>
+        <div class="radio-group" style="margin-top:8px">
+          <label class="radio-option"><input type="radio" name="salidas" value="no"> <span>NO AUTORIZO la salida de las instalaciones del centro.</span></label>
+        </div>
+      </div>
+
       <div class="checkbox-group required-check" id="check-urgencias">
         <input type="checkbox" id="urgencias" onchange="this.closest('.checkbox-group').classList.toggle('checked',this.checked);this.closest('.checkbox-group').classList.remove('required-check')">
         <label for="urgencias"><strong>AUTORIZO</strong> al equipo de monitores a que en caso de máxima urgencia tras un accidente, tomen las decisiones y medidas oportunas si ha sido imposible mi localización. <span class="req">*</span></label>
@@ -463,6 +473,7 @@ async function enviarFormulario() {
   if (!valido) return;
 
   if (!document.querySelector('input[name="bano"]:checked')) { alert('Indica la autorización para el baño en piscina'); return; }
+  if (!document.querySelector('input[name="salidas"]:checked')) { alert('Indica la autorización para salidas del centro'); return; }
   if (!document.getElementById('urgencias').checked) { alert('Es obligatorio autorizar al equipo en caso de urgencia'); return; }
   if (!document.getElementById('acepta-normas').checked) { alert('Debes aceptar las normas de convivencia'); return; }
   if (!document.getElementById('acepta-lopd').checked) { alert('Debes aceptar la política de protección de datos'); return; }
@@ -497,6 +508,7 @@ async function enviarFormulario() {
     irse_solo: document.getElementById('irse-solo').checked,
     bano_piscina: document.querySelector('input[name="bano"]:checked')?.value === 'si',
     fotos_rrss: document.getElementById('fotos-rrss').checked,
+    salidas_centro: document.querySelector('input[name="salidas"]:checked')?.value === 'si',
     urgencias: document.getElementById('urgencias').checked,
     acepta_lopd: document.getElementById('acepta-lopd').checked,
     acepta_normas: document.getElementById('acepta-normas').checked,

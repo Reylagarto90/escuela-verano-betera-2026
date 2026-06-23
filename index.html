@@ -745,6 +745,7 @@ async function renderPendientes() {
         <div><span style="color:#888">🏊 Piscina:</span> ${f.bano_piscina?'Autorizado':'No autorizado'}</div>
         <div><span style="color:#888">🚶 Irse solo:</span> ${f.irse_solo?'Sí':'No'}</div>
         <div><span style="color:#888">📸 Fotos:</span> ${f.fotos_rrss?'Autorizado':'No autorizado'}</div>
+        <div><span style="color:#888">🚶 Salidas centro:</span> ${f.salidas_centro?'Autorizado':'No autorizado'}</div>
         <div><span style="color:#888">🔑 Autorizado 1:</span> ${f.autorizado1_nombre||'—'} ${f.autorizado1_dni?'('+f.autorizado1_dni+')':''}</div>
         ${f.autorizado2_nombre?`<div><span style="color:#888">🔑 Autorizado 2:</span> ${f.autorizado2_nombre} (${f.autorizado2_dni})</div>`:''}
         ${f.observaciones?`<div style="grid-column:1/-1"><span style="color:#888">📝 Observaciones:</span> ${f.observaciones}</div>`:''}
