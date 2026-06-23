@@ -12,7 +12,7 @@
 // ══════════════════════════════════════════
 const SUPABASE_URL = 'https://wxhsyfqlrfpgtzwtwqrk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4aHN5ZnFscmZwZ3R6d3R3cXJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTUxMzAsImV4cCI6MjA5Nzc3MTEzMH0.qmLr4HsWGjdOfpPOj7gwaEDd-vpS7_ZZ-IH1YseT_F0';
-const PINS = { director: '1234', coordinadora: '0000' };
+const PINS = { director: '1234', coordinadora: '0000', monitor: '5500' };
 </script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -190,8 +190,8 @@ function seleccionarRol(r) {
   rol = r;
   document.getElementById('login-roles').style.display = 'none';
   document.getElementById('login-pin').style.display = 'block';
-  document.getElementById('pin-label').textContent = (r==='director'?'🏛️ Director':'📋 Coordinadora') + ' · Introduce tu PIN';
-  document.getElementById('btn-entrar').style.background = r==='director' ? '#5a3e8e' : '#0ea5e9';
+  document.getElementById('pin-label').textContent = (r==='director'?'🏛️ Director':r==='coordinadora'?'📋 Coordinadora':'👟 Monitor') + ' · Introduce tu PIN';
+  document.getElementById('btn-entrar').style.background = r==='director' ? '#5a3e8e' : r==='coordinadora' ? '#0ea5e9' : '#15803d';
   document.getElementById('pin-input').focus();
 }
 
@@ -243,7 +243,7 @@ async function cargarDatos() {
   fichas = {};
   (rF.data||[]).forEach(f => { fichas[f.participante_id] = f; });
   formulariosPendientes = rPend.data || [];
-  document.getElementById('header-sub').textContent = (rol==='director'?'🏛️ Director':'📋 Coordinadora') + ' · ☁️ sincronizado';
+  document.getElementById('header-sub').textContent = (rol==='director'?'🏛️ Director':rol==='coordinadora'?'📋 Coordinadora':'👟 Monitor') + ' · ☁️ sincronizado';
 }
 
 function toast(msg) {
@@ -253,7 +253,7 @@ function toast(msg) {
 }
 
 function renderHeader() {
-  const acc = rol==='director' ? '#5a3e8e' : '#0ea5e9';
+  const acc = rol==='director' ? '#5a3e8e' : rol==='coordinadora' ? '#0ea5e9' : '#15803d';
   document.getElementById('app-header').style.background = `linear-gradient(135deg,${acc},#f7971e)`;
   const tabsDir = [
     {key:'dashboard',    label:'📊 Inicio'},
@@ -264,15 +264,25 @@ function renderHeader() {
     {key:'tareas',       label:'📋 Tareas'},
     {key:'informes',     label:'📈 Informes'},
     {key:'pendientes',   label:'📥 Pendientes'},
+    {key:'autorizaciones',label:'🔐 Autorizaciones'},
     {key:'tablero',      label:'📢 Tablero'},
   ];
   const tabsCoord = [
-    {key:'asistencia',label:'✅ Pasar lista'},
-    {key:'grupos',    label:'👥 Grupos'},
-    {key:'fichas',    label:'🏥 Fichas'},
-    {key:'tablero',   label:'📢 Tablero'},
+    {key:'asistencia',    label:'✅ Pasar lista'},
+    {key:'grupos',        label:'👥 Grupos'},
+    {key:'fichas',        label:'🏥 Fichas'},
+    {key:'autorizaciones',label:'🔐 Autorizaciones'},
+    {key:'participantes', label:'👦 Participantes'},
+    {key:'pendientes',    label:'📥 Pendientes'},
+    {key:'tablero',       label:'📢 Tablero'},
   ];
-  const tabs = rol==='director' ? tabsDir : tabsCoord;
+  const tabsMonitor = [
+    {key:'asistencia',    label:'✅ Pasar lista'},
+    {key:'fichas',        label:'🏥 Fichas'},
+    {key:'autorizaciones',label:'🔐 Autorizaciones'},
+    {key:'tablero',       label:'📢 Tablero'},
+  ];
+  const tabs = rol==='director' ? tabsDir : rol==='coordinadora' ? tabsCoord : tabsMonitor;
   document.getElementById('tabs-container').innerHTML = tabs.map(t =>
     `<button class="tab-btn${tabActual===t.key?' active':''}" id="tab-${t.key}" onclick="mostrarTab('${t.key}')" style="${tabActual===t.key?'color:'+acc:''}">${t.label}</button>`
   ).join('');
@@ -281,7 +291,7 @@ function renderHeader() {
 function mostrarTab(key) {
   tabActual = key;
   renderHeader();
-  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,tablero:renderTablero};
+  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,tablero:renderTablero};
   if (renders[key]) renders[key]();
 }
 
@@ -517,15 +527,102 @@ function renderFichas() {
       }).join('')}
     </div>`;
 }
-function abrirFicha(pid) {
+function abrirFicha(pid, origen) {
   const p = participantes.find(x=>x.id===pid);
   const f = fichas[pid]||{};
-  const acc = rol==='director'?'#5a3e8e':'#0ea5e9';
+  const acc = rol==='director'?'#5a3e8e':rol==='coordinadora'?'#0ea5e9':'#15803d';
+  const esReadOnly = rol==='monitor';
+  const fam = formulariosPendientes.find(x=>x.participante_id===pid && x.estado==='aprobado');
+  const volverFn = origen==='autorizaciones' ? 'renderAutorizaciones()' : 'renderFichas()';
+
+  const badgeAut = (val, si='✅ Sí', no='❌ No') => val
+    ? `<span style="background:#f0fdf4;color:#15803d;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700">${si}</span>`
+    : `<span style="background:#fff1f2;color:#be123c;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700">${no}</span>`;
+
+  const seccionAutorizaciones = fam ? `
+    <div style="background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #e8eaff">
+      <h3 style="margin:0 0 14px;font-size:14px;color:#5a3e8e">✅ Autorizaciones</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee">
+          <span style="font-size:13px">🏊 Baño en piscina</span>${badgeAut(fam.bano_piscina)}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee">
+          <span style="font-size:13px">🚶 Salidas del centro</span>${badgeAut(fam.salidas_centro)}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee">
+          <span style="font-size:13px">🏠 Irse solo a casa</span>${badgeAut(fam.irse_solo)}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee">
+          <span style="font-size:13px">📸 Fotos y RRSS</span>${badgeAut(fam.fotos_rrss)}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee">
+          <span style="font-size:13px">🚨 Decisiones urgencia</span>${badgeAut(fam.urgencias)}
+        </div>
+      </div>
+      ${fam.separacion_divorcio ? `
+        <div style="margin-top:12px;background:#fff7ed;border-radius:10px;padding:12px 14px;border-left:3px solid #f97316">
+          <div style="font-weight:700;font-size:13px;color:#c2410c;margin-bottom:6px">⚠️ Separación / Divorcio</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px;font-size:12px">
+            <div><span style="color:#888">Custodia:</span> ${fam.prog2_custodia||'—'}</div>
+            <div><span style="color:#888">Otro progenitor:</span> ${fam.prog2_nombre||''} ${fam.prog2_apellidos||''}</div>
+            <div><span style="color:#888">DNI:</span> ${fam.prog2_dni||'—'}</div>
+            <div><span style="color:#888">Teléfono:</span> ${fam.prog2_telefono||'—'}</div>
+            <div><span style="color:#888">Email:</span> ${fam.prog2_email||'—'}</div>
+          </div>
+        </div>` : ''}
+      <div style="margin-top:12px;background:#f8f9ff;border-radius:10px;padding:10px 14px;font-size:12px">
+        <div style="font-weight:600;color:#555;margin-bottom:6px">🔑 Personas autorizadas a recoger</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px">
+          ${fam.padre_nombre?`<div>👨 ${fam.padre_nombre} · DNI: ${fam.padre_dni||'—'}</div>`:''}
+          ${fam.madre_nombre?`<div>👩 ${fam.madre_nombre} · DNI: ${fam.madre_dni||'—'}</div>`:''}
+          ${fam.autorizado1_nombre?`<div>🔑 ${fam.autorizado1_nombre} · DNI: ${fam.autorizado1_dni||'—'}</div>`:''}
+          ${fam.autorizado2_nombre?`<div>🔑 ${fam.autorizado2_nombre} · DNI: ${fam.autorizado2_dni||'—'}</div>`:''}
+        </div>
+      </div>
+    </div>` : `
+    <div style="background:#fff7ed;border-radius:12px;padding:12px 16px;margin-bottom:16px;border:1px solid #fde68a;font-size:13px;color:#c2410c">
+      ⚠️ Esta familia aún no ha enviado el formulario de autorización.
+    </div>`;
+
   document.getElementById('main-content').innerHTML = `
     <div class="card">
-      <button class="btn btn-ghost" onclick="renderFichas()" style="margin-bottom:14px">← Volver</button>
-      <h2 style="margin-bottom:4px">🏥 ${p.nombre}</h2>
-      <p style="color:#888;font-size:12px;margin-bottom:20px">Contacto: ${p.contacto} · ${p.telefono}</p>
+      <button class="btn btn-ghost" onclick="${volverFn}" style="margin-bottom:14px">← Volver</button>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#667eea,#f7971e);display:flex;align-items:center;justify-content:center;font-size:20px">👦</div>
+        <div>
+          <h2 style="margin:0;font-size:18px">${p.nombre}</h2>
+          <div style="font-size:12px;color:#888">${p.contacto} · ${p.telefono} ${p.grupo?'· '+p.grupo:''}</div>
+        </div>
+        ${fam?`<span style="margin-left:auto;background:#f0fdf4;color:#15803d;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">✓ Formulario recibido</span>`:''}
+      </div>
+
+      <!-- DATOS TUTOR -->
+      ${fam ? `
+      <div style="background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #e8eaff">
+        <h3 style="margin:0 0 12px;font-size:14px;color:#5a3e8e">👨‍👩‍👧 Datos del tutor</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:13px">
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">Nombre completo</span>${fam.tutor_nombre||'—'} ${fam.tutor_apellidos||''}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">DNI</span>${fam.tutor_dni||'—'}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">Teléfono principal</span>${fam.tutor_telefono||'—'}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">Teléfono alternativo</span>${fam.tutor_telefono_alt||'—'}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">Email</span>${fam.tutor_email||'—'}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">Nivel educativo</span>${fam.nivel_educativo||'—'}</div>
+          <div style="padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee"><span style="color:#888;font-size:11px;display:block">SIP</span>${fam.sip||'—'}</div>
+        </div>
+      </div>` : ''}
+
+      ${seccionAutorizaciones}
+
+      ${esReadOnly ? `
+        <div style="background:#f8f9ff;border-radius:12px;padding:16px;border:1px solid #e8eaff">
+          <h3 style="margin:0 0 12px;font-size:14px;color:#5a3e8e">🏥 Datos médicos</h3>
+          <div style="display:grid;gap:10px;font-size:13px">
+            ${f.alergias?`<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #f97316"><strong>🌿 Alergias:</strong> ${f.alergias}</div>`:''}
+            ${f.medicacion?`<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #ef4444"><strong>💊 Medicación:</strong> ${f.medicacion}</div>`:''}
+            ${f.observaciones?`<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #5a3e8e"><strong>📝 Observaciones:</strong> ${f.observaciones}</div>`:''}
+            ${!f.alergias && !f.medicacion && !f.observaciones?`<p style="color:#aaa">Sin datos médicos registrados.</p>`:''}
+          </div>
+        </div>` : `
       <div class="form-row">
         <div class="form-group">
           <label>🎂 Fecha de nacimiento</label>
@@ -547,7 +644,7 @@ function abrirFicha(pid) {
       <div class="form-group"><label>📝 Observaciones generales</label><textarea id="f-observaciones" rows="3" placeholder="Cualquier info relevante para monitores...">${f.observaciones||''}</textarea></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-primary" style="flex:1;background:${acc}" onclick="guardarFicha(${pid})">💾 Guardar ficha</button>
-        <button class="btn btn-ghost" onclick="renderFichas()">Cancelar</button>
+        <button class="btn btn-ghost" onclick="${volverFn}">Cancelar</button>
       </div>
     </div>`;
   document.getElementById('f-fechanac').addEventListener('change',function(){
@@ -862,6 +959,86 @@ async function guardarNuevoParticipante() {
 
   toast('Participante añadido ✓');
   renderParticipantes();
+}
+
+
+let filtrosAut = { piscina:'todos', salidas:'todos', fotos:'todos', solo:'todos', divorcio:'todos', urgencias:'todos' };
+
+function renderAutorizaciones() {
+  const aprobados = formulariosPendientes.filter(f => f.estado === 'aprobado');
+
+  const filtrar = (lista) => lista.filter(f => {
+    if (filtrosAut.piscina !== 'todos' && String(f.bano_piscina) !== filtrosAut.piscina) return false;
+    if (filtrosAut.salidas !== 'todos' && String(f.salidas_centro) !== filtrosAut.salidas) return false;
+    if (filtrosAut.fotos !== 'todos' && String(f.fotos_rrss) !== filtrosAut.fotos) return false;
+    if (filtrosAut.solo !== 'todos' && String(f.irse_solo) !== filtrosAut.solo) return false;
+    if (filtrosAut.divorcio !== 'todos' && String(f.separacion_divorcio) !== filtrosAut.divorcio) return false;
+    if (filtrosAut.urgencias !== 'todos' && String(f.urgencias) !== filtrosAut.urgencias) return false;
+    return true;
+  });
+
+  const lista = filtrar(aprobados);
+
+  const selectFiltro = (campo, label) => `
+    <div>
+      <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:4px">${label}</label>
+      <select onchange="filtrosAut.${campo}=this.value;renderAutorizaciones()" style="padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px;width:100%">
+        <option value="todos">Todos</option>
+        <option value="true" ${filtrosAut[campo]==='true'?'selected':''}>✅ Sí</option>
+        <option value="false" ${filtrosAut[campo]==='false'?'selected':''}>❌ No</option>
+      </select>
+    </div>`;
+
+  const badge = (val) => val
+    ? '<span style="background:#f0fdf4;color:#15803d;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700">✅ Sí</span>'
+    : '<span style="background:#fff1f2;color:#be123c;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700">❌ No</span>';
+
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <h2 style="margin:0">🔐 Autorizaciones (${lista.length} de ${aprobados.length})</h2>
+        <button onclick="filtrosAut={piscina:'todos',salidas:'todos',fotos:'todos',solo:'todos',divorcio:'todos',urgencias:'todos'};renderAutorizaciones()" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px">🔄 Limpiar filtros</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;padding:14px;background:#f8f9ff;border-radius:12px">
+        ${selectFiltro('piscina','🏊 Piscina')}
+        ${selectFiltro('salidas','🚶 Salidas centro')}
+        ${selectFiltro('fotos','📸 Fotos/RRSS')}
+        ${selectFiltro('solo','🏠 Irse solo')}
+        ${selectFiltro('urgencias','🚨 Urgencias')}
+        ${selectFiltro('divorcio','⚠️ Separación')}
+      </div>
+      ${lista.length === 0 ? '<p style="color:#aaa;text-align:center;padding:20px">No hay formularios que coincidan con los filtros</p>' : `
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr style="background:#f8f9ff">
+              <th>Participante</th>
+              <th class="center">🏊 Piscina</th>
+              <th class="center">🚶 Salidas</th>
+              <th class="center">📸 Fotos</th>
+              <th class="center">🏠 Solo</th>
+              <th class="center">🚨 Urgencias</th>
+              <th class="center">⚠️ Divorcio</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lista.map(f => {
+              const p = participantes.find(x => x.id === f.participante_id);
+              return `<tr>
+                <td style="font-weight:600;cursor:pointer;color:#5a3e8e" onclick="abrirFicha(${f.participante_id},'autorizaciones')">${p ? p.nombre : '—'}${f.separacion_divorcio?' ⚠️':''}</td>
+                <td class="center">${badge(f.bano_piscina)}</td>
+                <td class="center">${badge(f.salidas_centro)}</td>
+                <td class="center">${badge(f.fotos_rrss)}</td>
+                <td class="center">${badge(f.irse_solo)}</td>
+                <td class="center">${badge(f.urgencias)}</td>
+                <td class="center">${badge(f.separacion_divorcio)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+      <p style="font-size:11px;color:#aaa;margin-top:12px">Solo se muestran participantes con formulario aprobado (${aprobados.length} de ${participantes.length} total)</p>
+    </div>`;
 }
 
 window.onload = init;
