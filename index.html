@@ -132,7 +132,7 @@ textarea{resize:vertical}
 <script>
 const SURL = 'https://wxhsyfqlrfpgtzwtwqrk.supabase.co';
 const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4aHN5ZnFscmZwZ3R6d3R3cXJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTUxMzAsImV4cCI6MjA5Nzc3MTEzMH0.qmLr4HsWGjdOfpPOj7gwaEDd-vpS7_ZZ-IH1YseT_F0';
-const RKEY = 're_L2AJcefZ_MWVuTLxCvSJpNddVpyAu8Pp9';
+const RKEY = ''; // Se configura via Supabase Edge Function
 const PINS = {director:'1234',coordinadora:'0000',monitor:'5500'};
 
 const SEMANAS = [
@@ -1210,6 +1210,18 @@ function renderComunicados(){
   c.appendChild(card);
 }
 
+function construirEmailHtml(mensaje) {
+  const msgHtml = mensaje.split('\n').join('<br>');
+  return '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">' +
+    '<div style="background:linear-gradient(135deg,#667eea,#f7971e);padding:20px;border-radius:12px 12px 0 0;text-align:center">' +
+    '<h1 style="color:#fff;margin:0;font-size:20px">Escuela de Verano Betera 2026</h1></div>' +
+    '<div style="background:#fff;padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px">' +
+    '<p style="font-size:15px;color:#333;line-height:1.6">' + msgHtml + '</p>' +
+    '<hr style="border:none;border-top:1px solid #eee;margin:20px 0">' +
+    '<p style="font-size:12px;color:#aaa">Escuela de Verano Betera 2026 - Grupo Tome - info@grupotome.es</p>' +
+    '</div></div>';
+}
+
 async function enviarComunicado(){
   const asunto=(el('com-asunto')?.value||'').trim();
   const mensaje=(el('com-mensaje')?.value||'').trim();
@@ -1232,14 +1244,7 @@ async function enviarComunicado(){
         body:JSON.stringify({
           from:'Escuela Verano Bétera <onboarding@resend.dev>',
           to:email,subject:asunto,
-          html:'<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">'+
-            '<div style="background:linear-gradient(135deg,#667eea,#f7971e);padding:20px;border-radius:12px 12px 0 0;text-align:center">'+
-            '<h1 style="color:#fff;margin:0;font-size:20px">☀️ Escuela de Verano Bétera 2026</h1></div>'+
-            '<div style="background:#fff;padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px">'+
-            '<p style="font-size:15px;color:#333;line-height:1.6">'+mensaje.replace(/\n/g,'<br>')+'</p>'+
-            '<hr style="border:none;border-top:1px solid #eee;margin:20px 0">'+
-            '<p style="font-size:12px;color:#aaa">Escuela de Verano Bétera 2026 · Grupo Tome · info@grupotome.es</p>'+
-            '</div></div>'
+          html: construirEmailHtml(mensaje)
         })
       });
       if(res.ok)ok++;else err++;
