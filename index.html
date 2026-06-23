@@ -392,7 +392,7 @@ function filaP(p,i) {
   const divorcio = f?.separacion_divorcio;
   return `<tr>
     <td style="color:#bbb;font-size:11px">${i}</td>
-    <td style="font-weight:600">${p.nombre}${divorcio?` <span title="Separación/divorcio - revisar custodia" style="cursor:help">⚠️</span>`:'''}</td>
+    <td style="font-weight:600">${p.nombre}${divorcio?' <span title="Separación/divorcio - revisar custodia" style="cursor:help">⚠️</span>':''}</td>
     <td>${p.contacto||'—'}</td>
     <td style="font-family:monospace;font-size:11px">${p.telefono||'—'}</td>
     <td>${tempBadge(p.temporalidad)}</td>
