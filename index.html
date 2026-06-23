@@ -1074,7 +1074,7 @@ function renderAutorizaciones(){
       const tr=document.createElement('tr');
       const tdName=document.createElement('td');tdName.style.cssText='font-weight:600;cursor:pointer;color:#5a3e8e';
       tdName.textContent=(p?p.nombre:'—')+(f.separacion_divorcio?' ⚠️':'');
-      tdName.onclick=()=>abrirFicha(f.participante_id,'autorizaciones');
+      tdName.onclick=()=>{tabActual='fichas';abrirFicha(f.participante_id,'autorizaciones');window.scrollTo(0,0);};
       tr.appendChild(tdName);
       [f.bano_piscina,f.salidas_centro,f.fotos_rrss,f.irse_solo,f.urgencias,f.separacion_divorcio].forEach(v=>{
         const td=document.createElement('td');td.className='tc';td.innerHTML=badgeAut(v);tr.appendChild(td);
