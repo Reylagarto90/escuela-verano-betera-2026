@@ -132,7 +132,7 @@ textarea{resize:vertical}
 <script>
 const SURL = 'https://wxhsyfqlrfpgtzwtwqrk.supabase.co';
 const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4aHN5ZnFscmZwZ3R6d3R3cXJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTUxMzAsImV4cCI6MjA5Nzc3MTEzMH0.qmLr4HsWGjdOfpPOj7gwaEDd-vpS7_ZZ-IH1YseT_F0';
-const RKEY = ''; // Se configura via Supabase Edge Function
+const EDGE_EMAIL = 'https://wxhsyfqlrfpgtzwtwqrk.supabase.co/functions/v1/enviar-email';
 const PINS = {director:'1234',coordinadora:'0000',monitor:'5500'};
 
 const SEMANAS = [
@@ -1238,13 +1238,13 @@ async function enviarComunicado(){
   let ok=0,err=0;
   for(const email of emailsList){
     try{
-      const res=await fetch('https://api.resend.com/emails',{
+      const res=await fetch(EDGE_EMAIL,{
         method:'POST',
-        headers:{'Authorization':'Bearer '+RKEY,'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+SKEY},
         body:JSON.stringify({
-          from:'Escuela Verano Bétera <onboarding@resend.dev>',
-          to:email,subject:asunto,
-          html: construirEmailHtml(mensaje)
+          to:email,
+          subject:asunto,
+          html:construirEmailHtml(mensaje)
         })
       });
       if(res.ok)ok++;else err++;
