@@ -1266,7 +1266,11 @@ function mostrarFormCom(sec, emailsFam) {
       actualizarContadorInd();
     };
     row.appendChild(cb);
-    row.innerHTML+=f.nombre+(p&&p.grupo?' <span class="badge '+(p.grupo==='Peques'?'bg-purple':p.grupo==='Medios'?'bg-orange':'bg-green')+'">'+p.grupo+'</span>':'')+' <span style="color:#aaa;font-size:11px">'+f.email+'</span>';
+    const nombreMenor = p ? p.nombre : '';
+    row.innerHTML += '<strong>' + f.nombre + '</strong>' +
+      ' <span style="color:#5a3e8e;font-size:11px">('+nombreMenor+')</span>' +
+      (p&&p.grupo?' <span class="badge '+(p.grupo==='Peques'?'bg-purple':p.grupo==='Medios'?'bg-orange':'bg-green')+'">'+p.grupo+'</span>':'') +
+      ' <span style="color:#aaa;font-size:11px">'+f.email+'</span>';
     listaInd.appendChild(row);
   });
   dDest.appendChild(listaInd);
