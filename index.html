@@ -388,9 +388,11 @@ function renderParticipantes() {
 }
 function filaP(p,i) {
   const ok = fichas[p.id]?.ficha_completa;
+  const f = formulariosPendientes.find(x=>x.participante_id===p.id && x.estado==='aprobado');
+  const divorcio = f?.separacion_divorcio;
   return `<tr>
     <td style="color:#bbb;font-size:11px">${i}</td>
-    <td style="font-weight:600">${p.nombre}</td>
+    <td style="font-weight:600">${p.nombre}${divorcio?` <span title="Separación/divorcio - revisar custodia" style="cursor:help">⚠️</span>`:'''}</td>
     <td>${p.contacto||'—'}</td>
     <td style="font-family:monospace;font-size:11px">${p.telefono||'—'}</td>
     <td>${tempBadge(p.temporalidad)}</td>
@@ -746,7 +748,10 @@ async function renderPendientes() {
         <div><span style="color:#888">🚶 Irse solo:</span> ${f.irse_solo?'Sí':'No'}</div>
         <div><span style="color:#888">📸 Fotos:</span> ${f.fotos_rrss?'Autorizado':'No autorizado'}</div>
         <div><span style="color:#888">🚶 Salidas centro:</span> ${f.salidas_centro?'Autorizado':'No autorizado'}</div>
+        <div><span style="color:#888">🔑 Padre:</span> ${f.padre_nombre||'—'} ${f.padre_dni?'('+f.padre_dni+')':''}</div>
+        <div><span style="color:#888">🔑 Madre:</span> ${f.madre_nombre||'—'} ${f.madre_dni?'('+f.madre_dni+')':''}</div>
         <div><span style="color:#888">🔑 Autorizado 1:</span> ${f.autorizado1_nombre||'—'} ${f.autorizado1_dni?'('+f.autorizado1_dni+')':''}</div>
+        ${f.separacion_divorcio?`<div style="grid-column:1/-1;background:#fff7ed;border-radius:8px;padding:8px 12px;border-left:3px solid #f97316"><strong>⚠️ Separación/divorcio</strong> · Custodia: ${f.prog2_custodia||'—'} · Otro progenitor: ${f.prog2_nombre||''} ${f.prog2_apellidos||''} · DNI: ${f.prog2_dni||'—'} · Tel: ${f.prog2_telefono||'—'}</div>`:''}
         ${f.autorizado2_nombre?`<div><span style="color:#888">🔑 Autorizado 2:</span> ${f.autorizado2_nombre} (${f.autorizado2_dni})</div>`:''}
         ${f.observaciones?`<div style="grid-column:1/-1"><span style="color:#888">📝 Observaciones:</span> ${f.observaciones}</div>`:''}
       </div>

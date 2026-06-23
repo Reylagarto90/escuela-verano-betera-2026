@@ -259,16 +259,81 @@
           <input type="tel" id="tutor-telefono-alt" placeholder="600 000 000">
         </div>
       </div>
-      <div class="checkbox-group">
-        <input type="checkbox" id="separacion" onchange="this.closest('.checkbox-group').classList.toggle('checked',this.checked)">
+      <div class="checkbox-group" id="check-separacion">
+        <input type="checkbox" id="separacion" onchange="
+          this.closest('.checkbox-group').classList.toggle('checked',this.checked);
+          document.getElementById('datos-otro-progenitor').style.display=this.checked?'block':'none'
+        ">
         <label for="separacion">Existe situación de separación o divorcio. Aportaré el documento de autorización del otro progenitor.</label>
+      </div>
+      <div id="datos-otro-progenitor" style="display:none;background:#fff7ed;border:1px solid #fde68a;border-radius:12px;padding:16px;margin-top:8px">
+        <div class="warning-box" style="margin-bottom:12px">⚠️ En caso de separación o divorcio se exige cumplimentar el documento de autorización por parte del progenitor que no haya realizado la inscripción. Dicho documento deberá ser enviado a <strong>info@grupotome.es</strong></div>
+        <p style="font-weight:700;font-size:13px;color:#444;margin-bottom:12px">Datos del otro progenitor:</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" id="prog2-nombre" placeholder="Nombre">
+          </div>
+          <div class="form-group">
+            <label>Apellidos</label>
+            <input type="text" id="prog2-apellidos" placeholder="Apellidos">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>DNI</label>
+            <input type="text" id="prog2-dni" placeholder="12345678A">
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" id="prog2-telefono" placeholder="600 000 000">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="prog2-email" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="form-group">
+          <label>Régimen de custodia</label>
+          <select id="prog2-custodia">
+            <option value="">Selecciona...</option>
+            <option value="Custodia compartida">Custodia compartida</option>
+            <option value="Custodia exclusiva madre">Custodia exclusiva madre</option>
+            <option value="Custodia exclusiva padre">Custodia exclusiva padre</option>
+            <option value="En proceso judicial">En proceso judicial</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
       </div>
     </div>
 
     <!-- PERSONAS AUTORIZADAS -->
     <div class="card">
       <h2>🔑 Personas autorizadas a recoger</h2>
-      <div class="info-box">Además del padre/madre/tutor, indica quién más puede recoger a tu hijo/a.</div>
+      <div class="info-box">Indica todas las personas autorizadas a recoger a tu hijo/a, incluyendo al padre y/o madre.</div>
+      <p style="font-weight:700;font-size:13px;color:#444;margin-bottom:10px">Padre</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre y apellidos del padre</label>
+          <input type="text" id="padre-nombre" placeholder="Nombre y apellidos">
+        </div>
+        <div class="form-group">
+          <label>DNI del padre</label>
+          <input type="text" id="padre-dni" placeholder="12345678A">
+        </div>
+      </div>
+      <p style="font-weight:700;font-size:13px;color:#444;margin-bottom:10px;margin-top:4px">Madre</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre y apellidos de la madre</label>
+          <input type="text" id="madre-nombre" placeholder="Nombre y apellidos">
+        </div>
+        <div class="form-group">
+          <label>DNI de la madre</label>
+          <input type="text" id="madre-dni" placeholder="12345678A">
+        </div>
+      </div>
+      <p style="font-weight:700;font-size:13px;color:#444;margin-bottom:10px;margin-top:4px">Otras personas autorizadas</p>
       <div class="form-row">
         <div class="form-group">
           <label>Nombre 1ª persona autorizada <span class="req">*</span></label>
@@ -362,7 +427,7 @@
       </div>
 
       <div class="normas-box" style="margin-top:14px;font-size:11px;color:#555">
-        En cumplimiento de la Ley Orgánica 3/2018 de Protección de Datos Personales y garantía de los derechos digitales, el Reglamento UE 2016/679 y la LSSICE 34/2002, le informamos de que los datos facilitados serán incluidos en un fichero con la única finalidad de gestionar y planificar la Escuela de Verano 2026. Los datos no serán facilitados a terceros. Puede ejercitar los derechos de acceso, rectificación, supresión, portabilidad y limitación enviando una solicitud a campusbetera.tome@gmail.com
+        En cumplimiento de la Ley Orgánica 3/2018 de Protección de Datos Personales y garantía de los derechos digitales, el Reglamento UE 2016/679 y la LSSICE 34/2002, le informamos de que los datos facilitados serán incluidos en un fichero con la única finalidad de gestionar y planificar la Escuela de Verano 2026. Los datos no serán facilitados a terceros. Puede ejercitar los derechos de acceso, rectificación, supresión, portabilidad y limitación enviando una solicitud a info@grupotome.es
       </div>
 
       <div class="checkbox-group required-check" id="check-lopd" style="margin-top:10px">
@@ -381,7 +446,7 @@
       <div class="success-icon">🎉</div>
       <h2>¡Formulario enviado!</h2>
       <p style="margin-bottom:16px">Los datos de <strong id="nombre-confirmacion"></strong> han sido enviados correctamente y están <strong>pendientes de revisión</strong> por la organización.</p>
-      <p style="margin-bottom:24px">Recibirás confirmación cuando sean aprobados. Si tienes alguna duda contacta con nosotros en <strong>campusbetera.tome@gmail.com</strong></p>
+      <p style="margin-bottom:24px">Recibirás confirmación cuando sean aprobados. Si tienes alguna duda contacta con nosotros en <strong>info@grupotome.es</strong></p>
       <button class="btn-submit" onclick="nuevoFormulario()" style="max-width:300px;margin:0 auto;display:block">Enviar otro formulario</button>
     </div>
   </div>
@@ -501,6 +566,16 @@ async function enviarFormulario() {
     tutor_telefono_alt: document.getElementById('tutor-telefono-alt').value.trim(),
     tutor_email: document.getElementById('tutor-email').value.trim(),
     separacion_divorcio: document.getElementById('separacion').checked,
+    prog2_nombre: document.getElementById('prog2-nombre')?.value.trim()||'',
+    prog2_apellidos: document.getElementById('prog2-apellidos')?.value.trim()||'',
+    prog2_dni: document.getElementById('prog2-dni')?.value.trim()||'',
+    prog2_telefono: document.getElementById('prog2-telefono')?.value.trim()||'',
+    prog2_email: document.getElementById('prog2-email')?.value.trim()||'',
+    prog2_custodia: document.getElementById('prog2-custodia')?.value||'',
+    padre_nombre: document.getElementById('padre-nombre')?.value.trim()||'',
+    padre_dni: document.getElementById('padre-dni')?.value.trim()||'',
+    madre_nombre: document.getElementById('madre-nombre')?.value.trim()||'',
+    madre_dni: document.getElementById('madre-dni')?.value.trim()||'',
     autorizado1_nombre: document.getElementById('aut1-nombre').value.trim(),
     autorizado1_dni: document.getElementById('aut1-dni').value.trim(),
     autorizado2_nombre: document.getElementById('aut2-nombre').value.trim(),
