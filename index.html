@@ -1248,10 +1248,11 @@ async function renderComunicados() {
 
   html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Destinatarios *</label>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  html += '<button onclick="selDestinatario(this,'todos')" data-dest="todos" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #5a3e8e;background:#5a3e8e;color:#fff;font-size:12px;font-weight:600;cursor:pointer">👥 Todos (' + totalEmails + ')</button>';
+  html += '<button onclick="selDestinatario(this,\'todos\')" data-dest="todos" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #5a3e8e;background:#5a3e8e;color:#fff;font-size:12px;font-weight:600;cursor:pointer">👥 Todos (' + totalEmails + ')</button>';
   ['Peques','Medios','Mayores'].forEach(function(g) {
     const cnt = emails.filter(function(e){ const p = participantes.find(function(x){return x.id===e.pid;}); return p && p.grupo===g; }).length;
-    html += '<button onclick="selDestinatario(this,'' + g + '')" data-dest="' + g + '" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #e0e0e0;background:#f5f5f5;color:#555;font-size:12px;font-weight:600;cursor:pointer">' + (g==='Peques'?'🐣':'g'==='Medios'?'🧒':'🧑') + ' ' + g + ' (' + cnt + ')</button>';
+    const ico = g==='Peques'?'🐣':g==='Medios'?'🧒':'🧑';
+    html += '<button onclick="selDestinatario(this,\'' + g + '\')" data-dest="' + g + '" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #e0e0e0;background:#f5f5f5;color:#555;font-size:12px;font-weight:600;cursor:pointer">' + ico + ' ' + g + ' (' + cnt + ')</button>';
   });
   html += '</div></div>';
 
