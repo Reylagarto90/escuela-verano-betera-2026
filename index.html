@@ -39,7 +39,7 @@ const PINS = { director: '1234', coordinadora: '0000', monitor: '5500' };
   .header-title { color:#fff; font-weight:800; font-size:15px; }
   .header-sub { color:rgba(255,255,255,.8); font-size:11px; }
   .btn-salir { background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:8px; padding:5px 11px; cursor:pointer; font-size:12px; }
-  .tabs { display:flex; gap:2px; overflow-x:auto; }
+  .tabs { display:flex; gap:2px; flex-wrap:wrap; }
   .tab-btn { padding:7px 13px; border-radius:8px 8px 0 0; border:none; font-weight:500; cursor:pointer; font-size:12px; white-space:nowrap; color:#fff; background:rgba(255,255,255,.15); transition:all .15s; }
   .tab-btn.active { background:#fff; font-weight:700; }
 
@@ -283,9 +283,13 @@ function renderHeader() {
     {key:'tablero',       label:'📢 Tablero'},
   ];
   const tabs = rol==='director' ? tabsDir : rol==='coordinadora' ? tabsCoord : tabsMonitor;
-  document.getElementById('tabs-container').innerHTML = tabs.map(t =>
-    `<button class="tab-btn${tabActual===t.key?' active':''}" id="tab-${t.key}" onclick="mostrarTab('${t.key}')" style="${tabActual===t.key?'color:'+acc:''}">${t.label}</button>`
-  ).join('');
+  const mid = Math.ceil(tabs.length / 2);
+  const fila1 = tabs.slice(0, mid);
+  const fila2 = tabs.slice(mid);
+  const renderTab = t => `<button class="tab-btn${tabActual===t.key?' active':''}" id="tab-${t.key}" onclick="mostrarTab('${t.key}')" style="${tabActual===t.key?'color:'+acc:''}">${t.label}</button>`;
+  document.getElementById('tabs-container').innerHTML =
+    '<div style="display:flex;gap:2px;flex-wrap:wrap;margin-bottom:2px">' + fila1.map(renderTab).join('') + '</div>' +
+    '<div style="display:flex;gap:2px;flex-wrap:wrap">' + fila2.map(renderTab).join('') + '</div>';
 }
 
 function mostrarTab(key) {
@@ -324,13 +328,6 @@ function renderDashboard() {
   const tHechas  = tareas.filter(t => t.hecha).length;
   const urgentes = tareas.filter(t => !t.hecha && t.prioridad==='alta');
   const pendientes = participantes.filter(p => !fichas[p.id]?.ficha_completa);
-  const seccionMedicosReadOnly = '<div style="background:#f8f9ff;border-radius:12px;padding:16px;border:1px solid #e8eaff"><h3 style="margin:0 0 12px;font-size:14px;color:#5a3e8e">🏥 Datos médicos</h3><div style="display:grid;gap:10px;font-size:13px">'
-    + (f.alergias ? '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #f97316"><strong>🌿 Alergias:</strong> ' + f.alergias + '</div>' : '')
-    + (f.medicacion ? '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #ef4444"><strong>💊 Medicación:</strong> ' + f.medicacion + '</div>' : '')
-    + (f.observaciones ? '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #5a3e8e"><strong>📝 Observaciones:</strong> ' + f.observaciones + '</div>' : '')
-    + (!f.alergias && !f.medicacion && !f.observaciones ? '<p style="color:#aaa">Sin datos médicos registrados.</p>' : '')
-    + '</div></div>';
-
   document.getElementById('main-content').innerHTML = `
     <div class="stats-grid">
       <div class="stat-card" style="background:#EEF2FF"><div style="font-size:20px">👦</div><div class="stat-val" style="color:#5a3e8e">${participantes.length}</div><div class="stat-label">Participantes</div></div>
