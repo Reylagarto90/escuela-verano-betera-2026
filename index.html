@@ -233,7 +233,7 @@ async function cargarDatos(){
     sb.from('asistencia').select('*'),
     sb.from('fichas').select('*'),
     sb.from('tareas').select('*').order('id'),
-    sb.from('anuncios').select('*').order('created_at',{ascending:false}),
+    sb.from('anuncios').select('*').order('created_at',{ascending:false}).eq('estado','aprobado'),
     sb.from('formularios_pendientes').select('*').order('created_at',{ascending:false}),
     sb.from('incidencias').select('*').order('created_at',{ascending:false}),
     sb.from('comunicados').select('*').order('created_at',{ascending:false}),
@@ -255,7 +255,7 @@ async function cargarDatos(){
 function renderHeader(){
   el('app-header').style.background='linear-gradient(135deg,'+acc()+',#f7971e)';
   const tabsDir=[
-    {k:'dashboard',l:'📊 Inicio'},{k:'participantes',l:'👦 Participantes'},
+    {k:'dashboard',l:'📊 Inicio'},{k:'por_aprobar',l:'⏳ Por aprobar'},{k:'participantes',l:'👦 Participantes'},
     {k:'grupos',l:'👥 Grupos'},{k:'asistencia',l:'✅ Asistencia'},
     {k:'fichas',l:'🏥 Fichas'},{k:'tareas',l:'📋 Tareas'},
     {k:'informes',l:'📈 Informes'},{k:'pendientes',l:'📥 Pendientes'},
@@ -296,7 +296,7 @@ function mostrarTab(k){
   tabActual=k;
   renderHeader();
   const map={
-    dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,
+    dashboard:renderDashboard,por_aprobar:renderPorAprobar,participantes:renderParticipantes,grupos:renderGrupos,
     asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,
     informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,
     incidencias:renderIncidencias,comunicados:renderComunicados,tablero:renderTablero
@@ -323,7 +323,7 @@ function renderDashboard(){
     {i:'🏥',v:fichasOk+'/'+participantes.length,l:'Fichas completas',bg:'#f0fdf4',co:'#15803d',k:'fichas'},
     {i:'📋',v:tHechas+'/'+tareas.length,l:'Tareas hechas',bg:'#fff7ed',co:'#c2410c',k:'tareas'},
     {i:'🚨',v:urgentes.length,l:'Tareas urgentes',bg:'#fff1f2',co:'#be123c',k:'tareas'},
-    {i:'📥',v:formPend,l:'Formularios pendientes',bg:'#fff7ed',co:'#c2410c',k:'pendientes'},
+    {i:'⏳',v:formPend+incPend,l:'Por aprobar',bg:'#fff7ed',co:'#c2410c',k:'por_aprobar'},
     {i:'🚑',v:incPend,l:'Incidencias pendientes',bg:'#fff1f2',co:'#be123c',k:'incidencias'},
   ].forEach(s=>{
     const d=document.createElement('div');
@@ -1389,9 +1389,20 @@ async function confirmarEnvio(){
 
   if(lista.length===0){alert('No hay destinatarios seleccionados');return}
 
+  if(rol==='coordinadora'){
+    // Save as pending for director approval
+    const destLabel=dest==='todos'?'Todos':dest==='individual'?'Selección individual':dest;
+    const {data}=await sb.from('comunicados').insert({
+      asunto,mensaje,destinatarios:destLabel,total_enviados:0,errores:0,enviado_por:rol,estado:'pendiente',
+      emails_json:JSON.stringify(lista.map(f=>f.email||f))
+    }).select().single();
+    if(data)comunicadosHistorial.unshift(data);
+    toast('Comunicado enviado al director para aprobación ⏳');
+    renderComunicados();
+    return;
+  }
   const confirmar=confirm('¿Enviar "'+asunto+'" a '+lista.length+' familia'+(lista.length>1?'s':'')+'?');
   if(!confirmar)return;
-
   await enviarComunicado(lista,asunto,mensaje,dest);
 }
 
@@ -1415,10 +1426,9 @@ async function enviarComunicado(lista,asunto,mensaje,dest){
     }catch(e){err++}
   }
   if(estadoEl)estadoEl.textContent='✅ Enviados: '+ok+(err>0?' · ❌ Errores: '+err:'');
-  // Guardar en historial
   const destLabel=dest==='todos'?'Todos':dest==='individual'?'Selección individual':dest;
   const {data}=await sb.from('comunicados').insert({
-    asunto,mensaje,destinatarios:destLabel,total_enviados:ok,errores:err,enviado_por:rol
+    asunto,mensaje,destinatarios:destLabel,total_enviados:ok,errores:err,enviado_por:rol,estado:'aprobado'
   }).select().single();
   if(data)comunicadosHistorial.unshift(data);
   toast('Comunicado enviado a '+ok+' familias ✓');
@@ -1429,12 +1439,23 @@ function renderTablero(){
   const c=el('main-content');c.innerHTML='';
   const card=document.createElement('div');card.className='card';
   card.innerHTML='<h2>📢 Tablero de avisos</h2>';
-  const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-bottom:16px';
-  const inp=document.createElement('input');inp.type='text';inp.placeholder='Escribe un aviso...';
-  inp.onkeydown=e=>{if(e.key==='Enter'&&inp.value.trim())addAnuncio(inp.value.trim(),inp)};
-  const btn=document.createElement('button');btn.className='btn btn-primary';btn.style.background=acc();btn.textContent='Publicar';
-  btn.onclick=()=>{if(inp.value.trim())addAnuncio(inp.value.trim(),inp)};
+  const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap';
+  const inp=document.createElement('input');inp.type='text';inp.id='aviso-texto';inp.placeholder='Escribe un aviso...';inp.style.flex='1';
+  inp.onkeydown=e=>{if(e.key==='Enter'&&inp.value.trim())addAnuncioCompleto(inp)};
+  const btn=document.createElement('button');btn.className='btn btn-primary';btn.style.background=acc();
+  btn.textContent=rol==='director'?'Publicar':'Enviar para aprobación';
+  btn.onclick=()=>{if(inp.value.trim())addAnuncioCompleto(inp)};
   row.appendChild(inp);row.appendChild(btn);card.appendChild(row);
+  if(rol==='director'){
+    const opts=document.createElement('div');opts.style.cssText='display:flex;gap:16px;margin-bottom:16px;font-size:13px';
+    const lbPub=document.createElement('label');lbPub.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer';
+    const cbPub=document.createElement('input');cbPub.type='checkbox';cbPub.id='aviso-publico';
+    lbPub.appendChild(cbPub);lbPub.innerHTML+='📢 Visible para familias';
+    const lbUrg=document.createElement('label');lbUrg.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer';
+    const cbUrg=document.createElement('input');cbUrg.type='checkbox';cbUrg.id='aviso-urgente';
+    lbUrg.appendChild(cbUrg);lbUrg.innerHTML+='🚨 Urgente';
+    opts.appendChild(lbPub);opts.appendChild(lbUrg);card.appendChild(opts);
+  }
   anuncios.forEach(a=>{
     const div=document.createElement('div');div.className='anuncio-item';div.style.borderLeft='3px solid '+acc();
     const content=document.createElement('div');
@@ -1449,13 +1470,176 @@ function renderTablero(){
   });
   c.appendChild(card);
 }
+async function addAnuncioCompleto(inp){
+  const texto=inp.value.trim();
+  if(!texto)return;
+  const autor=rol==='director'?'Director':rol==='coordinadora'?'Coordinadora':'Monitor';
+  const estado=rol==='director'?'aprobado':'pendiente';
+  const publico=el('aviso-publico')?.checked||false;
+  const urgente=el('aviso-urgente')?.checked||false;
+  const {data}=await sb.from('anuncios').insert({texto,autor,estado,publico,urgente}).select().single();
+  if(data){
+    if(estado==='aprobado')anuncios.unshift(data);
+    toast(estado==='aprobado'?'Aviso publicado ✓':'Aviso enviado para aprobación ⏳');
+  }
+  inp.value='';renderTablero();
+}
+
 async function addAnuncio(texto,inp){
   const autor=rol==='director'?'Director':rol==='coordinadora'?'Coordinadora':'Monitor';
-  const {data}=await sb.from('anuncios').insert({texto,autor}).select().single();
-  if(data)anuncios.unshift(data);inp.value='';renderTablero();
+  const estado=rol==='director'?'aprobado':'pendiente';
+  const {data}=await sb.from('anuncios').insert({texto,autor,estado,publico:false,urgente:false}).select().single();
+  if(data){
+    if(estado==='aprobado')anuncios.unshift(data);
+    toast(estado==='aprobado'?'Aviso publicado ✓':'Aviso enviado para aprobación ⏳');
+  }
+  inp.value='';renderTablero();
 }
 async function deleteAnuncio(id){
   await sb.from('anuncios').delete().eq('id',id);anuncios=anuncios.filter(a=>a.id!==id);renderTablero();
+}
+
+
+async function renderPorAprobar(){
+  // Load fresh pending items
+  const [rAn, rCom] = await Promise.all([
+    sb.from('anuncios').select('*').eq('estado','pendiente').order('created_at',{ascending:false}),
+    sb.from('comunicados').select('*').eq('estado','pendiente').order('created_at',{ascending:false}),
+  ]);
+  const avisosPend = rAn.data||[];
+  const comPend = rCom.data||[];
+  const incPend = incidencias.filter(i=>i.estado==='pendiente');
+  const formPend = pendientes.filter(f=>f.estado==='pendiente');
+  const total = avisosPend.length+comPend.length+incPend.length+formPend.length;
+
+  const c=el('main-content');c.innerHTML='';
+  const card=document.createElement('div');card.className='card';
+  const hdr=document.createElement('div');hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px';
+  hdr.innerHTML='<h2 style="margin:0">⏳ Pendiente de aprobación</h2><span class="badge bg-orange">'+total+' elementos</span>';
+  card.appendChild(hdr);
+
+  if(total===0){
+    card.innerHTML+='<p style="color:#aaa;text-align:center;padding:30px">¡Todo al día! No hay nada pendiente de aprobación 🎉</p>';
+    c.appendChild(card);return;
+  }
+
+  // Avisos pendientes
+  if(avisosPend.length>0){
+    const sec=document.createElement('div');sec.style.marginBottom='20px';
+    sec.innerHTML='<div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px">📢 Avisos del tablero ('+avisosPend.length+')</div>';
+    avisosPend.forEach(a=>{
+      const d=document.createElement('div');d.style.cssText='border:1px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:8px;background:#fffbe6';
+      d.innerHTML='<div style="font-size:11px;color:#888;margin-bottom:6px">'+new Date(a.created_at).toLocaleDateString('es-ES')+' · Por: '+a.autor+'</div>'+
+        '<div style="font-size:14px;margin-bottom:10px">'+a.texto+'</div>';
+      const btns=document.createElement('div');btns.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+      // Opciones publico/urgente
+      const lbPub=document.createElement('label');lbPub.style.cssText='display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer';
+      const cbPub=document.createElement('input');cbPub.type='checkbox';cbPub.id='pub-'+a.id;
+      lbPub.appendChild(cbPub);lbPub.innerHTML+='📢 Para familias';
+      const lbUrg=document.createElement('label');lbUrg.style.cssText='display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer';
+      const cbUrg=document.createElement('input');cbUrg.type='checkbox';cbUrg.id='urg-'+a.id;
+      lbUrg.appendChild(cbUrg);lbUrg.innerHTML+='🚨 Urgente';
+      const nota=document.createElement('input');nota.type='text';nota.id='nota-av-'+a.id;nota.placeholder='Nota (opcional)';nota.style.cssText='flex:1;min-width:150px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px';
+      const bApr=document.createElement('button');bApr.style.cssText='background:#15803d;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600';bApr.textContent='✅ Aprobar';
+      bApr.onclick=()=>aprobarAviso(a.id);
+      const bRech=document.createElement('button');bRech.style.cssText='background:#be123c;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600';bRech.textContent='❌ Rechazar';
+      bRech.onclick=()=>rechazarAviso(a.id);
+      btns.appendChild(lbPub);btns.appendChild(lbUrg);btns.appendChild(nota);btns.appendChild(bApr);btns.appendChild(bRech);
+      d.appendChild(btns);sec.appendChild(d);
+    });
+    card.appendChild(sec);
+  }
+
+  // Comunicados pendientes
+  if(comPend.length>0){
+    const sec=document.createElement('div');sec.style.marginBottom='20px';
+    sec.innerHTML='<div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px">📧 Comunicados por email ('+comPend.length+')</div>';
+    comPend.forEach(com=>{
+      const d=document.createElement('div');d.style.cssText='border:1px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:8px;background:#fffbe6';
+      d.innerHTML='<div style="font-size:11px;color:#888;margin-bottom:4px">'+new Date(com.created_at).toLocaleDateString('es-ES')+' · Por: '+com.enviado_por+' · Destinatarios: '+com.destinatarios+'</div>'+
+        '<div style="font-weight:700;font-size:14px;margin-bottom:4px">'+com.asunto+'</div>'+
+        '<div style="font-size:13px;color:#555;background:#fff;padding:8px;border-radius:8px;margin-bottom:10px">'+com.mensaje.substring(0,150)+(com.mensaje.length>150?'...':'')+'</div>';
+      const btns=document.createElement('div');btns.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+      const nota=document.createElement('input');nota.type='text';nota.id='nota-com-'+com.id;nota.placeholder='Nota (opcional)';nota.style.cssText='flex:1;min-width:150px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px';
+      const bApr=document.createElement('button');bApr.style.cssText='background:#15803d;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600';bApr.textContent='✅ Aprobar y enviar';
+      bApr.onclick=()=>aprobarComunicado(com);
+      const bRech=document.createElement('button');bRech.style.cssText='background:#be123c;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600';bRech.textContent='❌ Rechazar';
+      bRech.onclick=()=>rechazarComunicado(com.id);
+      btns.appendChild(nota);btns.appendChild(bApr);btns.appendChild(bRech);d.appendChild(btns);sec.appendChild(d);
+    });
+    card.appendChild(sec);
+  }
+
+  // Incidencias pendientes
+  if(incPend.length>0){
+    const sec=document.createElement('div');sec.style.marginBottom='20px';
+    sec.innerHTML='<div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px">🚑 Incidencias ('+incPend.length+') <button onclick="mostrarTab(&quot;incidencias&quot;)" style="background:none;border:none;color:#5a3e8e;cursor:pointer;font-size:12px">Ver todas →</button></div>';
+    incPend.slice(0,3).forEach(inc=>{
+      const p=participantes.find(x=>x.id===inc.participante_id);
+      const d=document.createElement('div');d.style.cssText='border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:6px;background:#fffbe6;display:flex;justify-content:space-between;align-items:center;cursor:pointer';
+      d.innerHTML='<div><div style="font-weight:600;font-size:13px">'+(p?p.nombre:'—')+'</div><div style="font-size:11px;color:#888">'+inc.tipo+' · '+new Date(inc.fecha).toLocaleDateString('es-ES')+'</div></div>';
+      d.onclick=()=>mostrarTab('incidencias');
+      sec.appendChild(d);
+    });
+    card.appendChild(sec);
+  }
+
+  // Formularios pendientes
+  if(formPend.length>0){
+    const sec=document.createElement('div');
+    sec.innerHTML='<div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px">📥 Formularios de familias ('+formPend.length+') <button onclick="mostrarTab(&quot;pendientes&quot;)" style="background:none;border:none;color:#5a3e8e;cursor:pointer;font-size:12px">Ver todos →</button></div>';
+    formPend.slice(0,3).forEach(f=>{
+      const p=participantes.find(x=>x.id===f.participante_id);
+      const d=document.createElement('div');d.style.cssText='border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:6px;background:#fffbe6;display:flex;justify-content:space-between;align-items:center;cursor:pointer';
+      d.innerHTML='<div><div style="font-weight:600;font-size:13px">'+(p?p.nombre:'—')+'</div><div style="font-size:11px;color:#888">'+(f.tutor_nombre||'')+' · '+new Date(f.created_at).toLocaleDateString('es-ES')+'</div></div>';
+      d.onclick=()=>mostrarTab('pendientes');
+      sec.appendChild(d);
+    });
+    card.appendChild(sec);
+  }
+
+  c.appendChild(card);
+}
+
+async function aprobarAviso(id){
+  const publico=el('pub-'+id)?.checked||false;
+  const urgente=el('urg-'+id)?.checked||false;
+  await sb.from('anuncios').update({estado:'aprobado',publico,urgente}).eq('id',id);
+  const {data}=await sb.from('anuncios').select('*').eq('id',id).single();
+  if(data)anuncios.unshift(data);
+  toast('Aviso aprobado ✓');renderPorAprobar();
+}
+
+async function rechazarAviso(id){
+  const nota=el('nota-av-'+id)?.value||'';
+  await sb.from('anuncios').update({estado:'rechazado',nota_revision:nota}).eq('id',id);
+  toast('Aviso rechazado');renderPorAprobar();
+}
+
+async function aprobarComunicado(com){
+  // Send emails
+  const emails = com.emails_json ? JSON.parse(com.emails_json) : [];
+  if(emails.length===0){toast('No hay emails para enviar');return}
+  let ok=0,err=0;
+  for(const email of emails){
+    try{
+      const res=await fetch(EDGE_EMAIL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+SKEY},
+        body:JSON.stringify({to:email,subject:com.asunto,html:construirEmailHtml(com.mensaje)})
+      });
+      if(res.ok)ok++;else err++;
+    }catch(e){err++}
+  }
+  await sb.from('comunicados').update({estado:'aprobado',total_enviados:ok,errores:err}).eq('id',com.id);
+  toast('Comunicado aprobado y enviado a '+ok+' familias ✓');
+  renderPorAprobar();
+}
+
+async function rechazarComunicado(id){
+  const nota=el('nota-com-'+id)?.value||'';
+  await sb.from('comunicados').update({estado:'rechazado',nota_revision:nota}).eq('id',id);
+  toast('Comunicado rechazado');renderPorAprobar();
 }
 
 window.onload=init;
