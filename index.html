@@ -679,7 +679,8 @@ function abrirFicha(pid,origen){
   const p=participantes.find(x=>x.id===pid);
   const f=fichas[pid]||{};
   const esRO=rol==='monitor';
-  const fam=pendientes.find(x=>x.participante_id===pid&&x.estado==='aprobado');
+  const famsAprobados=pendientes.filter(x=>x.participante_id===pid&&x.estado==='aprobado').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const fam=famsAprobados.length>0?famsAprobados[0]:null;
   const volver=origen==='autorizaciones'?renderAutorizaciones:renderFichas;
   const incP=incidencias.filter(i=>i.participante_id===pid&&i.estado==='aprobada');
 
