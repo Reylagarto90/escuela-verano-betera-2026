@@ -345,7 +345,38 @@ function renderParticipantes() {
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <h2 style="margin:0">👦 Participantes (${participantes.length})</h2>
-        <input type="text" id="busqueda" placeholder="🔍 Buscar..." style="width:180px" oninput="filtrarParticipantes()">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="busqueda" placeholder="🔍 Buscar..." style="width:160px" oninput="filtrarParticipantes()">
+          ${rol==='director'?'<button onclick="mostrarFormNuevoParticipante()" style="background:#5a3e8e;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:600">+ Nuevo</button>':''}
+        </div>
+      </div>
+      <div id="form-nuevo-participante" style="display:none;background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #e8eaff">
+        <h3 style="margin:0 0 12px;font-size:14px;color:#5a3e8e">➕ Nuevo participante</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Nombre <span style="color:red">*</span></label><input type="text" id="np-nombre" placeholder="Nombre" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Apellidos <span style="color:red">*</span></label><input type="text" id="np-apellidos" placeholder="Apellidos" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Contacto (nombre tutor)</label><input type="text" id="np-contacto" placeholder="Nombre del tutor" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Teléfono <span style="color:red">*</span></label><input type="tel" id="np-telefono" placeholder="600 000 000" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Período <span style="color:red">*</span></label>
+            <select id="np-temporalidad" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">
+              <option value="Mes completo">Mes completo</option>
+              <option value="3 primeras semanas">3 primeras semanas</option>
+              <option value="Semana suelta">Semana suelta</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Grupo</label>
+            <select id="np-grupo" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">
+              <option value="">Sin asignar</option>
+              <option value="Peques">🐣 Peques</option>
+              <option value="Medios">🧒 Medios</option>
+              <option value="Mayores">🧑 Mayores</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="guardarNuevoParticipante()" style="background:#5a3e8e;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">💾 Guardar</button>
+          <button onclick="document.getElementById('form-nuevo-participante').style.display='none'" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px">Cancelar</button>
+        </div>
       </div>
       <div style="overflow-x:auto">
         <table>
@@ -785,6 +816,46 @@ async function rechazarFormulario(id) {
   await sb.from('formularios_pendientes').update({estado:'rechazado', notas_revision:nota}).eq('id',id);
   toast('Formulario rechazado');
   await renderPendientes();
+}
+
+
+function mostrarFormNuevoParticipante() {
+  const form = document.getElementById('form-nuevo-participante');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function guardarNuevoParticipante() {
+  const nombre = document.getElementById('np-nombre').value.trim();
+  const apellidos = document.getElementById('np-apellidos').value.trim();
+  const contacto = document.getElementById('np-contacto').value.trim();
+  const telefono = document.getElementById('np-telefono').value.trim();
+  const temporalidad = document.getElementById('np-temporalidad').value;
+  const grupo = document.getElementById('np-grupo').value;
+
+  if (!nombre || !apellidos || !telefono) {
+    alert('Nombre, apellidos y teléfono son obligatorios');
+    return;
+  }
+
+  const nombreCompleto = nombre + ' ' + apellidos;
+  const { data, error } = await sb.from('participantes').insert({
+    nombre: nombreCompleto,
+    contacto,
+    telefono,
+    temporalidad,
+    grupo,
+  }).select().single();
+
+  if (error) { alert('Error al guardar'); return; }
+
+  // Crear ficha vacía
+  await sb.from('fichas').insert({ participante_id: data.id });
+
+  participantes.push({ ...data, fecha_nac:'', nivel_educativo:'', sip:'' });
+  fichas[data.id] = { participante_id: data.id, ficha_completa: false, alergias:'', medicacion:'', observaciones:'' };
+
+  toast('Participante añadido ✓');
+  renderParticipantes();
 }
 
 window.onload = init;
