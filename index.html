@@ -993,11 +993,25 @@ async function aprobarFormulario(id,pid){
   if(f){
     await Promise.all([
       sb.from('participantes').update({fecha_nac:f.fecha_nac||null,nivel_educativo:f.nivel_educativo,sip:f.sip}).eq('id',pid),
-      sb.from('fichas').update({alergias:f.alergias,medicacion:f.tratamiento_detalle,observaciones:f.observaciones,alergia_bool:f.alergia_bool,ficha_completa:true,updated_at:new Date().toISOString()}).eq('participante_id',pid),
+      sb.from('fichas').update({
+        alergias: (f.alergia_bool ? f.alergias : '') + (f.dieta_bool ? (f.alergia_bool?'\n':'') + 'Dieta: ' + f.dieta_detalle : ''),
+        medicacion: f.tratamiento_bool ? f.tratamiento_detalle : '',
+        observaciones: (f.enfermedad_bool ? 'Enfermedad: ' + f.enfermedad_detalle + '\n' : '') + (f.observaciones||''),
+        alergia_bool: f.alergia_bool,
+        dieta_bool: f.dieta_bool,
+        enfermedad_bool: f.enfermedad_bool,
+        tratamiento_bool: f.tratamiento_bool,
+        ficha_completa: true,
+        updated_at: new Date().toISOString()
+      }).eq('participante_id',pid),
     ]);
     const p=participantes.find(x=>x.id===pid);
     if(p){p.fecha_nac=f.fecha_nac;p.nivel_educativo=f.nivel_educativo;}
-    if(fichas[pid])fichas[pid]={...fichas[pid],alergias:f.alergias,ficha_completa:true};
+    if(fichas[pid])fichas[pid]={...fichas[pid],
+      alergias:(f.alergia_bool?f.alergias:'')+(f.dieta_bool?(f.alergia_bool?'\n':'')+'Dieta: '+f.dieta_detalle:''),
+      medicacion:f.tratamiento_bool?f.tratamiento_detalle:'',
+      observaciones:(f.enfermedad_bool?'Enfermedad: '+f.enfermedad_detalle+'\n':'')+(f.observaciones||''),
+      ficha_completa:true};
   }
   toast('Formulario aprobado ✓');renderPendientes();
 }
