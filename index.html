@@ -268,6 +268,7 @@ function renderHeader() {
     {key:'pendientes',   label:'📥 Pendientes'},
     {key:'autorizaciones',label:'🔐 Autorizaciones'},
     {key:'incidencias',  label:'🚑 Incidencias'},
+    {key:'comunicados',  label:'📧 Comunicados'},
     {key:'tablero',      label:'📢 Tablero'},
   ];
   const tabsCoord = [
@@ -299,7 +300,7 @@ function renderHeader() {
 function mostrarTab(key) {
   tabActual = key;
   renderHeader();
-  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,incidencias:renderIncidencias,tablero:renderTablero};
+  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,incidencias:renderIncidencias,comunicados:renderComunicados,tablero:renderTablero};
   if (renders[key]) renders[key]();
 }
 
@@ -1089,23 +1090,38 @@ function renderIncidencias() {
   html += '<h2 style="margin:0">🚑 Incidencias</h2>';
   html += '<button onclick="mostrarFormIncidencia()" style="background:' + acc + ';color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">+ Nueva incidencia</button>';
   html += '</div>';
-  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
   html += '<span style="background:#fff7ed;color:#c2410c;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">⏳ ' + pendientes.length + ' pendientes</span>';
   html += '<span style="background:#f0fdf4;color:#15803d;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">✅ ' + aprobadas.length + ' aprobadas</span>';
+  html += '<span style="background:#EEF2FF;color:#5a3e8e;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">👦 ' + incidencias.filter(i=>i.ambito==='individual'&&i.estado==='aprobada').length + ' individuales</span>';
+  html += '<span style="background:#FFF7ED;color:#c2410c;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">👥 ' + incidencias.filter(i=>i.ambito==='grupo'&&i.estado==='aprobada').length + ' de grupo</span>';
+  html += '<span style="background:#F0FDF4;color:#15803d;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">📋 ' + incidencias.filter(i=>i.ambito==='general'&&i.estado==='aprobada').length + ' generales</span>';
   html += '</div>';
 
-  // Form nueva incidencia (hidden by default)
+  // Form nueva incidencia
   html += '<div id="form-incidencia" style="display:none;background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #e8eaff">';
   html += '<h3 style="margin:0 0 12px;font-size:14px;color:' + acc + '">🚑 Registrar incidencia</h3>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-  html += '<div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Participante *</label>';
-  html += '<select id="inc-participante" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"><option value="">Selecciona...</option>';
-  participantes.forEach(function(p) { html += '<option value="' + p.id + '">' + p.nombre + '</option>'; });
+  html += '<div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Ámbito *</label>';
+  html += '<select id="inc-ambito" onchange="actualizarAmbitoForm()" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">';
+  html += '<option value="individual">👦 Individual (un menor)</option>';
+  html += '<option value="grupo">👥 De grupo</option>';
+  html += '<option value="general">📋 General del centro</option>';
   html += '</select></div>';
   html += '<div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Gravedad *</label>';
   html += '<select id="inc-tipo" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">';
   html += '<option value="leve">🟢 Leve</option><option value="moderada">🟡 Moderada</option><option value="grave">🔴 Grave</option>';
   html += '</select></div></div>';
+  // Participante (solo para individual)
+  html += '<div id="campo-participante" style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Participante *</label>';
+  html += '<select id="inc-participante" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"><option value="">Selecciona...</option>';
+  participantes.forEach(function(p) { html += '<option value="' + p.id + '">' + p.nombre + '</option>'; });
+  html += '</select></div>';
+  // Grupo (solo para grupo)
+  html += '<div id="campo-grupo" style="display:none;margin-bottom:10px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Grupo *</label>';
+  html += '<select id="inc-grupo" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">';
+  html += '<option value="Peques">🐣 Peques</option><option value="Medios">🧒 Medios</option><option value="Mayores">🧑 Mayores</option>';
+  html += '</select></div>';
   html += '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Descripción *</label>';
   html += '<textarea id="inc-descripcion" rows="3" placeholder="Describe lo ocurrido..." style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></div>';
   html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Actuación / respuesta dada</label>';
@@ -1129,7 +1145,8 @@ function renderIncidencias() {
       html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
       html += '<div>';
       html += '<div style="font-weight:700;font-size:14px">' + (p?p.nombre:'—') + '</div>';
-      html += '<div style="font-size:11px;color:#888">' + new Date(inc.fecha).toLocaleDateString('es-ES') + ' · Registrado por: ' + inc.registrado_por + '</div>';
+      const ambitoLabel = inc.ambito==='grupo' ? '👥 Grupo: ' + (inc.grupo_nombre||'') : inc.ambito==='general' ? '📋 General' : '👦 Individual';
+      html += '<div style="font-size:11px;color:#888">' + new Date(inc.fecha).toLocaleDateString('es-ES') + ' · ' + ambitoLabel + ' · Registrado por: ' + inc.registrado_por + '</div>';
       html += '</div>';
       html += '<div style="display:flex;gap:6px">';
       html += '<span style="background:' + tipoBg + ';color:' + tipoColor + ';padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">' + (inc.tipo==='grave'?'🔴 Grave':inc.tipo==='moderada'?'🟡 Moderada':'🟢 Leve') + '</span>';
@@ -1152,20 +1169,33 @@ function renderIncidencias() {
   document.getElementById('main-content').innerHTML = html;
 }
 
+function actualizarAmbitoForm() {
+  const ambito = document.getElementById('inc-ambito')?.value;
+  const campoP = document.getElementById('campo-participante');
+  const campoG = document.getElementById('campo-grupo');
+  if (campoP) campoP.style.display = ambito === 'individual' ? 'block' : 'none';
+  if (campoG) campoG.style.display = ambito === 'grupo' ? 'block' : 'none';
+}
+
 function mostrarFormIncidencia() {
   const form = document.getElementById('form-incidencia');
   if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
 }
 
 async function guardarIncidencia() {
-  const pid = document.getElementById('inc-participante').value;
+  const ambito = document.getElementById('inc-ambito')?.value || 'individual';
+  const pid = ambito === 'individual' ? document.getElementById('inc-participante').value : null;
+  const grupo = ambito === 'grupo' ? document.getElementById('inc-grupo')?.value : null;
   const tipo = document.getElementById('inc-tipo').value;
   const descripcion = document.getElementById('inc-descripcion').value.trim();
   const actuacion = document.getElementById('inc-actuacion').value.trim();
-  if (!pid || !descripcion) { alert('Selecciona el participante y describe la incidencia'); return; }
+  if (ambito === 'individual' && !pid) { alert('Selecciona el participante'); return; }
+  if (!descripcion) { alert('Describe la incidencia'); return; }
   const estado = (rol==='director'||rol==='coordinadora') ? 'aprobada' : 'pendiente';
   const {data, error} = await sb.from('incidencias').insert({
-    participante_id: parseInt(pid), tipo, descripcion, actuacion,
+    participante_id: pid ? parseInt(pid) : null,
+    ambito, grupo_nombre: grupo,
+    tipo, descripcion, actuacion,
     registrado_por: rol, estado, fecha: new Date().toISOString()
   }).select().single();
   if (error) { alert('Error al guardar'); return; }
@@ -1190,6 +1220,119 @@ async function rechazarIncidencia(id) {
   if (inc) { inc.estado='rechazada'; inc.nota_revision=nota; }
   toast('Incidencia rechazada');
   renderIncidencias();
+}
+
+
+const RESEND_KEY = 're_L2AJcefZ_MWVuTLxCvSJpNddVpyAu8Pp9';
+
+async function renderComunicados() {
+  const emails = formulariosPendientes
+    .filter(f => f.estado === 'aprobado' && f.tutor_email)
+    .map(f => ({ nombre: f.tutor_nombre + ' ' + f.tutor_apellidos, email: f.tutor_email, pid: f.participante_id }));
+
+  const totalEmails = emails.length;
+  const sinEmail = participantes.length - totalEmails;
+
+  let html = '<div class="card">';
+  html += '<h2 style="margin:0 0 16px">📧 Comunicados a familias</h2>';
+
+  // Stats
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">';
+  html += '<div style="background:#EEF2FF;border-radius:12px;padding:14px"><div style="font-size:20px">📧</div><div style="font-size:22px;font-weight:800;color:#5a3e8e">' + totalEmails + '</div><div style="font-size:11px;color:#777">Familias con email</div></div>';
+  html += '<div style="background:#fff1f2;border-radius:12px;padding:14px"><div style="font-size:20px">⚠️</div><div style="font-size:22px;font-weight:800;color:#be123c">' + sinEmail + '</div><div style="font-size:11px;color:#777">Sin email aún</div></div>';
+  html += '</div>';
+
+  // Form
+  html += '<div style="background:#f8f9ff;border-radius:12px;padding:18px;border:1px solid #e8eaff;margin-bottom:16px">';
+  html += '<h3 style="margin:0 0 14px;font-size:14px;color:#5a3e8e">✉️ Nuevo comunicado</h3>';
+
+  html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Destinatarios *</label>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<button onclick="selDestinatario(this,'todos')" data-dest="todos" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #5a3e8e;background:#5a3e8e;color:#fff;font-size:12px;font-weight:600;cursor:pointer">👥 Todos (' + totalEmails + ')</button>';
+  ['Peques','Medios','Mayores'].forEach(function(g) {
+    const cnt = emails.filter(function(e){ const p = participantes.find(function(x){return x.id===e.pid;}); return p && p.grupo===g; }).length;
+    html += '<button onclick="selDestinatario(this,'' + g + '')" data-dest="' + g + '" class="dest-btn" style="padding:6px 14px;border-radius:8px;border:2px solid #e0e0e0;background:#f5f5f5;color:#555;font-size:12px;font-weight:600;cursor:pointer">' + (g==='Peques'?'🐣':'g'==='Medios'?'🧒':'🧑') + ' ' + g + ' (' + cnt + ')</button>';
+  });
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Asunto *</label>';
+  html += '<input type="text" id="com-asunto" placeholder="Ej: Recordatorio excursión jueves" style="width:100%;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"></div>';
+
+  html += '<div style="margin-bottom:14px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Mensaje *</label>';
+  html += '<textarea id="com-mensaje" rows="5" placeholder="Escribe el mensaje para las familias..." style="width:100%;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></div>';
+
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  html += '<button onclick="enviarComunicado()" style="background:#5a3e8e;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:13px;font-weight:700">📨 Enviar comunicado</button>';
+  html += '<span id="com-estado" style="font-size:13px;color:#888"></span>';
+  html += '</div></div>';
+
+  html += '<div style="background:#fff7ed;border-radius:10px;padding:12px 14px;font-size:12px;color:#c2410c;border-left:3px solid #f97316">';
+  html += '⚠️ Solo se enviarán emails a las <strong>' + totalEmails + ' familias</strong> que han completado el formulario con email. Las ' + sinEmail + ' restantes no recibirán el comunicado.';
+  html += '</div></div>';
+
+  document.getElementById('main-content').innerHTML = html;
+  window._destinatarioComunicado = 'todos';
+}
+
+function selDestinatario(btn, dest) {
+  window._destinatarioComunicado = dest;
+  document.querySelectorAll('.dest-btn').forEach(function(b) {
+    b.style.background = '#f5f5f5';
+    b.style.color = '#555';
+    b.style.borderColor = '#e0e0e0';
+  });
+  btn.style.background = '#5a3e8e';
+  btn.style.color = '#fff';
+  btn.style.borderColor = '#5a3e8e';
+}
+
+async function enviarComunicado() {
+  const asunto = document.getElementById('com-asunto').value.trim();
+  const mensaje = document.getElementById('com-mensaje').value.trim();
+  const dest = window._destinatarioComunicado || 'todos';
+  if (!asunto || !mensaje) { alert('Rellena el asunto y el mensaje'); return; }
+
+  const emails = formulariosPendientes
+    .filter(function(f) {
+      if (f.estado !== 'aprobado' || !f.tutor_email) return false;
+      if (dest === 'todos') return true;
+      const p = participantes.find(function(x){return x.id===f.participante_id;});
+      return p && p.grupo === dest;
+    })
+    .map(function(f){ return f.tutor_email; });
+
+  if (emails.length === 0) { alert('No hay emails para este grupo'); return; }
+
+  const estadoEl = document.getElementById('com-estado');
+  estadoEl.textContent = '⏳ Enviando a ' + emails.length + ' familias...';
+
+  let ok = 0, err = 0;
+  for (const email of emails) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Escuela Verano Bétera <info@grupotome.es>',
+          to: email,
+          subject: asunto,
+          html: '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">' +
+            '<div style="background:linear-gradient(135deg,#667eea,#f7971e);padding:20px;border-radius:12px 12px 0 0;text-align:center">' +
+            '<h1 style="color:#fff;margin:0;font-size:20px">☀️ Escuela de Verano Bétera 2026</h1></div>' +
+            '<div style="background:#fff;padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px">' +
+            '<p style="font-size:15px;color:#333;line-height:1.6">' + mensaje.replace(/
+/g,'<br>') + '</p>' +
+            '<hr style="border:none;border-top:1px solid #eee;margin:20px 0">' +
+            '<p style="font-size:12px;color:#aaa">Escuela de Verano Bétera 2026 · Grupo Tome · info@grupotome.es</p>' +
+            '</div></div>'
+        })
+      });
+      if (res.ok) ok++; else err++;
+    } catch(e) { err++; }
+  }
+
+  estadoEl.textContent = '✅ Enviados: ' + ok + (err>0?' · ❌ Errores: '+err:'');
+  toast('Comunicado enviado a ' + ok + ' familias ✓');
 }
 
 window.onload = init;
