@@ -178,7 +178,7 @@ const PERIODOS_INFORME = [
 ];
 
 let sb, rol, tabActual, semanaActual=0, informePeriodo='mes';
-let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[];
+let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[], formulariosPendientes=[];
 
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -227,12 +227,13 @@ function cerrarSesion() {
 
 async function cargarDatos() {
   document.getElementById('header-sub').textContent = '⏳ Cargando...';
-  const [rP,rA,rF,rT,rAn] = await Promise.all([
+  const [rP,rA,rF,rT,rAn,rPend] = await Promise.all([
     sb.from('participantes').select('*').order('id'),
     sb.from('asistencia').select('*'),
     sb.from('fichas').select('*'),
     sb.from('tareas').select('*').order('id'),
     sb.from('anuncios').select('*').order('created_at',{ascending:false}),
+    sb.from('formularios_pendientes').select('*').order('created_at',{ascending:false}),
   ]);
   participantes = rP.data || [];
   tareas        = rT.data || [];
@@ -241,6 +242,7 @@ async function cargarDatos() {
   (rA.data||[]).forEach(a => { asistencia[a.participante_id+'-'+a.fecha] = a.presente; });
   fichas = {};
   (rF.data||[]).forEach(f => { fichas[f.participante_id] = f; });
+  formulariosPendientes = rPend.data || [];
   document.getElementById('header-sub').textContent = (rol==='director'?'🏛️ Director':'📋 Coordinadora') + ' · ☁️ sincronizado';
 }
 
@@ -261,6 +263,7 @@ function renderHeader() {
     {key:'fichas',       label:'🏥 Fichas'},
     {key:'tareas',       label:'📋 Tareas'},
     {key:'informes',     label:'📈 Informes'},
+    {key:'pendientes',   label:'📥 Pendientes'},
     {key:'tablero',      label:'📢 Tablero'},
   ];
   const tabsCoord = [
@@ -278,7 +281,7 @@ function renderHeader() {
 function mostrarTab(key) {
   tabActual = key;
   renderHeader();
-  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,tablero:renderTablero};
+  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,tablero:renderTablero};
   if (renders[key]) renders[key]();
 }
 
@@ -317,6 +320,7 @@ function renderDashboard() {
       <div class="stat-card" style="background:#f0fdf4"><div style="font-size:20px">🏥</div><div class="stat-val" style="color:#15803d">${fichasOk}/${participantes.length}</div><div class="stat-label">Fichas completas</div></div>
       <div class="stat-card" style="background:#fff7ed"><div style="font-size:20px">📋</div><div class="stat-val" style="color:#c2410c">${tHechas}/${tareas.length}</div><div class="stat-label">Tareas hechas</div></div>
       <div class="stat-card" style="background:#fff1f2"><div style="font-size:20px">🚨</div><div class="stat-val" style="color:#be123c">${urgentes.length}</div><div class="stat-label">Urgentes</div></div>
+      <div class="stat-card" style="background:#fff7ed;cursor:pointer" onclick="mostrarTab('pendientes')"><div style="font-size:20px">📥</div><div class="stat-val" style="color:#c2410c">${formulariosPendientes.filter(f=>f.estado==='pendiente').length}</div><div class="stat-label">Formularios pendientes</div></div>
     </div>
     <div class="card">
       <h3>🏥 Fichas pendientes de recoger</h3>
@@ -675,6 +679,112 @@ async function deleteAnuncio(id){
   await sb.from('anuncios').delete().eq('id',id);
   anuncios=anuncios.filter(a=>a.id!==id);
   renderTablero();
+}
+
+
+async function renderPendientes() {
+  // Reload fresh data
+  const {data} = await sb.from('formularios_pendientes').select('*').order('created_at',{ascending:false});
+  formulariosPendientes = data || [];
+  const pendientes = formulariosPendientes.filter(f=>f.estado==='pendiente');
+  const aprobados  = formulariosPendientes.filter(f=>f.estado==='aprobado');
+  const rechazados = formulariosPendientes.filter(f=>f.estado==='rechazado');
+
+  const cardFormulario = (f) => {
+    const p = participantes.find(x=>x.id===f.participante_id);
+    const nombre = p ? p.nombre : 'Participante desconocido';
+    const fecha = new Date(f.created_at).toLocaleDateString('es-ES');
+    const estadoColor = f.estado==='pendiente'?'#c2410c':f.estado==='aprobado'?'#15803d':'#be123c';
+    const estadoBg = f.estado==='pendiente'?'#fff7ed':f.estado==='aprobado'?'#f0fdf4':'#fff1f2';
+    return `<div style="border:1px solid #eee;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-weight:700;font-size:14px">${nombre}</div>
+          <div style="font-size:11px;color:#888">Enviado el ${fecha} · ${f.tutor_nombre} ${f.tutor_apellidos}</div>
+        </div>
+        <span style="background:${estadoBg};color:${estadoColor};padding:4px 10px;border-radius:10px;font-size:11px;font-weight:700">${f.estado==='pendiente'?'⏳ Pendiente':f.estado==='aprobado'?'✅ Aprobado':'❌ Rechazado'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12px;margin-bottom:12px">
+        <div><span style="color:#888">📅 Nacimiento:</span> ${f.fecha_nac||'—'}</div>
+        <div><span style="color:#888">🏫 Nivel:</span> ${f.nivel_educativo||'—'}</div>
+        <div><span style="color:#888">🏥 SIP:</span> ${f.sip||'—'}</div>
+        <div><span style="color:#888">📱 Teléfono:</span> ${f.tutor_telefono||'—'}</div>
+        <div><span style="color:#888">🌿 Alergia:</span> ${f.alergia_bool?'Sí: '+f.alergias:'No'}</div>
+        <div><span style="color:#888">💊 Tratamiento:</span> ${f.tratamiento_bool?'Sí: '+f.tratamiento_detalle:'No'}</div>
+        <div><span style="color:#888">🏊 Piscina:</span> ${f.bano_piscina?'Autorizado':'No autorizado'}</div>
+        <div><span style="color:#888">🚶 Irse solo:</span> ${f.irse_solo?'Sí':'No'}</div>
+        <div><span style="color:#888">📸 Fotos:</span> ${f.fotos_rrss?'Autorizado':'No autorizado'}</div>
+        <div><span style="color:#888">🔑 Autorizado 1:</span> ${f.autorizado1_nombre||'—'} ${f.autorizado1_dni?'('+f.autorizado1_dni+')':''}</div>
+        ${f.autorizado2_nombre?`<div><span style="color:#888">🔑 Autorizado 2:</span> ${f.autorizado2_nombre} (${f.autorizado2_dni})</div>`:''}
+        ${f.observaciones?`<div style="grid-column:1/-1"><span style="color:#888">📝 Observaciones:</span> ${f.observaciones}</div>`:''}
+      </div>
+      ${f.estado==='pendiente'?`
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="nota-${f.id}" placeholder="Nota de revisión (opcional)" style="flex:1;min-width:150px;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px">
+          <button onclick="aprobarFormulario(${f.id},${f.participante_id})" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600">✅ Aprobar</button>
+          <button onclick="rechazarFormulario(${f.id})" style="background:#be123c;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600">❌ Rechazar</button>
+        </div>`:
+        f.notas_revision?`<div style="font-size:12px;color:#888;margin-top:4px">📝 Nota: ${f.notas_revision}</div>`:''}
+    </div>`;
+  };
+
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <h2 style="margin:0">📥 Formularios de familias</h2>
+        <div style="display:flex;gap:8px">
+          <span style="background:#fff7ed;color:#c2410c;padding:4px 10px;border-radius:10px;font-size:12px;font-weight:700">⏳ ${pendientes.length} pendientes</span>
+          <span style="background:#f0fdf4;color:#15803d;padding:4px 10px;border-radius:10px;font-size:12px;font-weight:700">✅ ${aprobados.length} aprobados</span>
+          <span style="background:#fff1f2;color:#be123c;padding:4px 10px;border-radius:10px;font-size:12px;font-weight:700">❌ ${rechazados.length} rechazados</span>
+        </div>
+      </div>
+      ${formulariosPendientes.length===0 ?
+        '<p style="color:#aaa;text-align:center;padding:30px">No hay formularios enviados aún</p>' :
+        formulariosPendientes.map(f => cardFormulario(f)).join('')}
+    </div>`;
+}
+
+async function aprobarFormulario(id, pid) {
+  const nota = document.getElementById('nota-'+id)?.value || '';
+  // Update estado
+  await sb.from('formularios_pendientes').update({estado:'aprobado', notas_revision:nota}).eq('id',id);
+  // Get form data and update participant ficha
+  const f = formulariosPendientes.find(x=>x.id===id);
+  if (f) {
+    await Promise.all([
+      sb.from('participantes').update({
+        fecha_nac: f.fecha_nac||null,
+        nivel_educativo: f.nivel_educativo,
+        sip: f.sip,
+        grupo: participantes.find(p=>p.id===pid)?.grupo||''
+      }).eq('id',pid),
+      sb.from('fichas').update({
+        alergias: f.alergias,
+        medicacion: f.tratamiento_detalle,
+        observaciones: f.observaciones,
+        alergia_bool: f.alergia_bool,
+        dieta_bool: f.dieta_bool,
+        enfermedad_bool: f.enfermedad_bool,
+        tratamiento_bool: f.tratamiento_bool,
+        tratamiento_detalle: f.tratamiento_detalle,
+        ficha_completa: true,
+        updated_at: new Date().toISOString()
+      }).eq('participante_id',pid),
+    ]);
+    // Update local data
+    const p = participantes.find(x=>x.id===pid);
+    if (p) { p.fecha_nac=f.fecha_nac; p.nivel_educativo=f.nivel_educativo; p.sip=f.sip; }
+    if (fichas[pid]) fichas[pid] = {...fichas[pid], alergias:f.alergias, ficha_completa:true};
+  }
+  toast('Formulario aprobado y datos actualizados ✓');
+  await renderPendientes();
+}
+
+async function rechazarFormulario(id) {
+  const nota = document.getElementById('nota-'+id)?.value || '';
+  await sb.from('formularios_pendientes').update({estado:'rechazado', notas_revision:nota}).eq('id',id);
+  toast('Formulario rechazado');
+  await renderPendientes();
 }
 
 window.onload = init;
