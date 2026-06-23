@@ -988,6 +988,11 @@ async function renderPendientes(){
 
 async function aprobarFormulario(id,pid){
   const nota=el('nota-'+id)?.value||'';
+  const fActual=pendientes.find(x=>x.id===id);
+  // If this is an update, mark previous formulario as superseded
+  if(fActual?.formulario_previo_id){
+    await sb.from('formularios_pendientes').update({estado:'supersedido'}).eq('id',fActual.formulario_previo_id);
+  }
   await sb.from('formularios_pendientes').update({estado:'aprobado',notas_revision:nota}).eq('id',id);
   const f=pendientes.find(x=>x.id===id);
   if(f){
@@ -1023,7 +1028,12 @@ async function rechazarFormulario(id){
 
 // ── AUTORIZACIONES ─────────────────────────────────────
 function renderAutorizaciones(){
-  const aprobados=pendientes.filter(f=>f.estado==='aprobado');
+  // Only show latest approved per participant (no duplicates)
+  const aprobadosTodos=pendientes.filter(f=>f.estado==='aprobado');
+  const aprobados=aprobadosTodos.filter((f,_,arr)=>{
+    const masReciente=arr.filter(x=>x.participante_id===f.participante_id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+    return masReciente.id===f.id;
+  });
   const filtrar=lista=>lista.filter(f=>{
     if(filtrosAut.piscina!=='todos'&&String(f.bano_piscina)!==filtrosAut.piscina)return false;
     if(filtrosAut.salidas!=='todos'&&String(f.salidas_centro)!==filtrosAut.salidas)return false;
