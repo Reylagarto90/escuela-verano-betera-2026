@@ -178,7 +178,7 @@ const PERIODOS_INFORME = [
 ];
 
 let sb, rol, tabActual, semanaActual=0, informePeriodo='mes', filtroGrupoAsis='todos';
-let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[], formulariosPendientes=[];
+let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[], formulariosPendientes=[], incidencias=[];
 
 async function init() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -227,13 +227,14 @@ function cerrarSesion() {
 
 async function cargarDatos() {
   document.getElementById('header-sub').textContent = '⏳ Cargando...';
-  const [rP,rA,rF,rT,rAn,rPend] = await Promise.all([
+  const [rP,rA,rF,rT,rAn,rPend,rInc] = await Promise.all([
     sb.from('participantes').select('*').order('id'),
     sb.from('asistencia').select('*'),
     sb.from('fichas').select('*'),
     sb.from('tareas').select('*').order('id'),
     sb.from('anuncios').select('*').order('created_at',{ascending:false}),
     sb.from('formularios_pendientes').select('*').order('created_at',{ascending:false}),
+    sb.from('incidencias').select('*').order('created_at',{ascending:false}),
   ]);
   participantes = rP.data || [];
   tareas        = rT.data || [];
@@ -243,6 +244,7 @@ async function cargarDatos() {
   fichas = {};
   (rF.data||[]).forEach(f => { fichas[f.participante_id] = f; });
   formulariosPendientes = rPend.data || [];
+  incidencias = rInc.data || [];
   document.getElementById('header-sub').textContent = (rol==='director'?'🏛️ Director':rol==='coordinadora'?'📋 Coordinadora':'👟 Monitor') + ' · ☁️ sincronizado';
 }
 
@@ -265,6 +267,7 @@ function renderHeader() {
     {key:'informes',     label:'📈 Informes'},
     {key:'pendientes',   label:'📥 Pendientes'},
     {key:'autorizaciones',label:'🔐 Autorizaciones'},
+    {key:'incidencias',  label:'🚑 Incidencias'},
     {key:'tablero',      label:'📢 Tablero'},
   ];
   const tabsCoord = [
@@ -272,6 +275,7 @@ function renderHeader() {
     {key:'grupos',        label:'👥 Grupos'},
     {key:'fichas',        label:'🏥 Fichas'},
     {key:'autorizaciones',label:'🔐 Autorizaciones'},
+    {key:'incidencias',   label:'🚑 Incidencias'},
     {key:'participantes', label:'👦 Participantes'},
     {key:'pendientes',    label:'📥 Pendientes'},
     {key:'tablero',       label:'📢 Tablero'},
@@ -295,7 +299,7 @@ function renderHeader() {
 function mostrarTab(key) {
   tabActual = key;
   renderHeader();
-  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,tablero:renderTablero};
+  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,pendientes:renderPendientes,autorizaciones:renderAutorizaciones,incidencias:renderIncidencias,tablero:renderTablero};
   if (renders[key]) renders[key]();
 }
 
@@ -335,6 +339,7 @@ function renderDashboard() {
       <div class="stat-card" style="background:#fff7ed"><div style="font-size:20px">📋</div><div class="stat-val" style="color:#c2410c">${tHechas}/${tareas.length}</div><div class="stat-label">Tareas hechas</div></div>
       <div class="stat-card" style="background:#fff1f2"><div style="font-size:20px">🚨</div><div class="stat-val" style="color:#be123c">${urgentes.length}</div><div class="stat-label">Urgentes</div></div>
       <div class="stat-card" style="background:#fff7ed;cursor:pointer" onclick="mostrarTab('pendientes')"><div style="font-size:20px">📥</div><div class="stat-val" style="color:#c2410c">${formulariosPendientes.filter(f=>f.estado==='pendiente').length}</div><div class="stat-label">Formularios pendientes</div></div>
+      <div class="stat-card" style="background:#fff1f2;cursor:pointer" onclick="mostrarTab('incidencias')"><div style="font-size:20px">🚑</div><div class="stat-val" style="color:#be123c">${incidencias.filter(i=>i.estado==='pendiente').length}</div><div class="stat-label">Incidencias pendientes</div></div>
     </div>
     <div class="card">
       <h3>🏥 Fichas pendientes de recoger</h3>
@@ -630,6 +635,22 @@ function abrirFicha(pid, origen) {
     if (f.alergias) html += '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #f97316"><strong>🌿 Alergias:</strong> ' + f.alergias + '</div>';
     if (f.medicacion) html += '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #ef4444"><strong>💊 Medicación:</strong> ' + f.medicacion + '</div>';
     if (f.observaciones) html += '<div style="padding:10px 14px;background:#fff;border-radius:8px;border-left:3px solid #5a3e8e"><strong>📝 Observaciones:</strong> ' + f.observaciones + '</div>';
+    // Incidencias del participante
+    const incP = incidencias.filter(i => i.participante_id === pid && i.estado === 'aprobada');
+    if (incP.length > 0) {
+      html += '<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:#be123c;margin-bottom:8px">🚑 Incidencias registradas (' + incP.length + ')</div>';
+      incP.forEach(function(inc) {
+        const tipoColor = inc.tipo==='grave'?'#be123c':inc.tipo==='moderada'?'#c2410c':'#15803d';
+        const tipoBg = inc.tipo==='grave'?'#fff1f2':inc.tipo==='moderada'?'#fff7ed':'#f0fdf4';
+        html += '<div style="background:' + tipoBg + ';border-radius:8px;padding:10px 14px;margin-bottom:6px;border-left:3px solid ' + tipoColor + '">';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:12px;color:' + tipoColor + '">' + (inc.tipo==='grave'?'🔴 Grave':inc.tipo==='moderada'?'🟡 Moderada':'🟢 Leve') + '</span><span style="font-size:11px;color:#888">' + new Date(inc.fecha).toLocaleDateString('es-ES') + '</span></div>';
+        html += '<div style="font-size:13px;margin-bottom:4px">' + inc.descripcion + '</div>';
+        if (inc.actuacion) html += '<div style="font-size:12px;color:#666"><strong>Actuación:</strong> ' + inc.actuacion + '</div>';
+        html += '<div style="font-size:11px;color:#aaa;margin-top:4px">Registrado por: ' + inc.registrado_por + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
     if (!f.alergias && !f.medicacion && !f.observaciones) html += '<p style="color:#aaa">Sin datos médicos registrados.</p>';
     html += '</div></div>';
   } else {
@@ -1049,6 +1070,121 @@ function renderAutorizaciones() {
       </div>`}
       <p style="font-size:11px;color:#aaa;margin-top:12px">Solo se muestran participantes con formulario aprobado (${aprobados.length} de ${participantes.length} total)</p>
     </div>`;
+}
+
+
+function renderIncidencias() {
+  const acc = rol==='director'?'#5a3e8e':rol==='coordinadora'?'#0ea5e9':'#15803d';
+  const esDir = rol==='director' || rol==='coordinadora';
+  const pendientes = incidencias.filter(i=>i.estado==='pendiente');
+  const aprobadas = incidencias.filter(i=>i.estado==='aprobada');
+
+  let html = '<div class="card">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
+  html += '<h2 style="margin:0">🚑 Incidencias</h2>';
+  html += '<button onclick="mostrarFormIncidencia()" style="background:' + acc + ';color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">+ Nueva incidencia</button>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html += '<span style="background:#fff7ed;color:#c2410c;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">⏳ ' + pendientes.length + ' pendientes</span>';
+  html += '<span style="background:#f0fdf4;color:#15803d;padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700">✅ ' + aprobadas.length + ' aprobadas</span>';
+  html += '</div>';
+
+  // Form nueva incidencia (hidden by default)
+  html += '<div id="form-incidencia" style="display:none;background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid #e8eaff">';
+  html += '<h3 style="margin:0 0 12px;font-size:14px;color:' + acc + '">🚑 Registrar incidencia</h3>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+  html += '<div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Participante *</label>';
+  html += '<select id="inc-participante" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px"><option value="">Selecciona...</option>';
+  participantes.forEach(function(p) { html += '<option value="' + p.id + '">' + p.nombre + '</option>'; });
+  html += '</select></div>';
+  html += '<div><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Gravedad *</label>';
+  html += '<select id="inc-tipo" style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px">';
+  html += '<option value="leve">🟢 Leve</option><option value="moderada">🟡 Moderada</option><option value="grave">🔴 Grave</option>';
+  html += '</select></div></div>';
+  html += '<div style="margin-bottom:10px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Descripción *</label>';
+  html += '<textarea id="inc-descripcion" rows="3" placeholder="Describe lo ocurrido..." style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></div>';
+  html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:4px">Actuación / respuesta dada</label>';
+  html += '<textarea id="inc-actuacion" rows="2" placeholder="Qué se hizo al respecto..." style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></div>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<button onclick="guardarIncidencia()" style="background:' + acc + ';color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">💾 Guardar</button>';
+  html += '<button onclick="document.getElementById('form-incidencia').style.display='none'" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px">Cancelar</button>';
+  html += '</div></div>';
+
+  // List incidencias
+  if (incidencias.length === 0) {
+    html += '<p style="color:#aaa;text-align:center;padding:20px">No hay incidencias registradas</p>';
+  } else {
+    incidencias.forEach(function(inc) {
+      const p = participantes.find(x=>x.id===inc.participante_id);
+      const tipoColor = inc.tipo==='grave'?'#be123c':inc.tipo==='moderada'?'#c2410c':'#15803d';
+      const tipoBg = inc.tipo==='grave'?'#fff1f2':inc.tipo==='moderada'?'#fff7ed':'#f0fdf4';
+      const estadoColor = inc.estado==='pendiente'?'#c2410c':inc.estado==='aprobada'?'#15803d':'#be123c';
+      const estadoBg = inc.estado==='pendiente'?'#fff7ed':inc.estado==='aprobada'?'#f0fdf4':'#fff1f2';
+      html += '<div style="border:1px solid #eee;border-radius:12px;padding:14px 16px;margin-bottom:10px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:14px">' + (p?p.nombre:'—') + '</div>';
+      html += '<div style="font-size:11px;color:#888">' + new Date(inc.fecha).toLocaleDateString('es-ES') + ' · Registrado por: ' + inc.registrado_por + '</div>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:6px">';
+      html += '<span style="background:' + tipoBg + ';color:' + tipoColor + ';padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">' + (inc.tipo==='grave'?'🔴 Grave':inc.tipo==='moderada'?'🟡 Moderada':'🟢 Leve') + '</span>';
+      html += '<span style="background:' + estadoBg + ';color:' + estadoColor + ';padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">' + (inc.estado==='pendiente'?'⏳ Pendiente':inc.estado==='aprobada'?'✅ Aprobada':'❌ Rechazada') + '</span>';
+      html += '</div></div>';
+      html += '<div style="font-size:13px;margin-bottom:6px">' + inc.descripcion + '</div>';
+      if (inc.actuacion) html += '<div style="font-size:12px;color:#666;margin-bottom:8px"><strong>Actuación:</strong> ' + inc.actuacion + '</div>';
+      if (inc.estado==='pendiente' && esDir) {
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+        html += '<input type="text" id="nota-inc-' + inc.id + '" placeholder="Nota de revisión (opcional)" style="flex:1;min-width:150px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:12px">';
+        html += '<button onclick="aprobarIncidencia(' + inc.id + ')" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600">✅ Aprobar</button>';
+        html += '<button onclick="rechazarIncidencia(' + inc.id + ')" style="background:#be123c;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600">❌ Rechazar</button>';
+        html += '</div>';
+      }
+      if (inc.nota_revision) html += '<div style="font-size:11px;color:#888;margin-top:6px">📝 Nota: ' + inc.nota_revision + '</div>';
+      html += '</div>';
+    });
+  }
+  html += '</div>';
+  document.getElementById('main-content').innerHTML = html;
+}
+
+function mostrarFormIncidencia() {
+  const form = document.getElementById('form-incidencia');
+  if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function guardarIncidencia() {
+  const pid = document.getElementById('inc-participante').value;
+  const tipo = document.getElementById('inc-tipo').value;
+  const descripcion = document.getElementById('inc-descripcion').value.trim();
+  const actuacion = document.getElementById('inc-actuacion').value.trim();
+  if (!pid || !descripcion) { alert('Selecciona el participante y describe la incidencia'); return; }
+  const estado = (rol==='director'||rol==='coordinadora') ? 'aprobada' : 'pendiente';
+  const {data, error} = await sb.from('incidencias').insert({
+    participante_id: parseInt(pid), tipo, descripcion, actuacion,
+    registrado_por: rol, estado, fecha: new Date().toISOString()
+  }).select().single();
+  if (error) { alert('Error al guardar'); return; }
+  incidencias.unshift(data);
+  toast('Incidencia registrada' + (estado==='pendiente'?' — pendiente de aprobación':' ✓'));
+  renderIncidencias();
+}
+
+async function aprobarIncidencia(id) {
+  const nota = document.getElementById('nota-inc-'+id)?.value || '';
+  await sb.from('incidencias').update({estado:'aprobada', nota_revision:nota, revisado_por:rol, revisado_at:new Date().toISOString()}).eq('id',id);
+  const inc = incidencias.find(x=>x.id===id);
+  if (inc) { inc.estado='aprobada'; inc.nota_revision=nota; }
+  toast('Incidencia aprobada ✓');
+  renderIncidencias();
+}
+
+async function rechazarIncidencia(id) {
+  const nota = document.getElementById('nota-inc-'+id)?.value || '';
+  await sb.from('incidencias').update({estado:'rechazada', nota_revision:nota, revisado_por:rol, revisado_at:new Date().toISOString()}).eq('id',id);
+  const inc = incidencias.find(x=>x.id===id);
+  if (inc) { inc.estado='rechazada'; inc.nota_revision=nota; }
+  toast('Incidencia rechazada');
+  renderIncidencias();
 }
 
 window.onload = init;

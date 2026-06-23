@@ -245,7 +245,7 @@
           <input type="text" id="tutor-dni" placeholder="12345678A">
         </div>
         <div class="form-group">
-          <label>Email</label>
+          <label>Email <span class="req">*</span></label>
           <input type="email" id="tutor-email" placeholder="correo@ejemplo.com">
         </div>
       </div>
@@ -519,6 +519,7 @@ async function enviarFormulario() {
     { id:'tutor-nombre', msg:'Nombre del tutor requerido' },
     { id:'tutor-apellidos', msg:'Apellidos del tutor requeridos' },
     { id:'tutor-dni', msg:'DNI del tutor requerido' },
+    { id:'tutor-email', msg:'Email del tutor requerido' },
     { id:'tutor-telefono', msg:'Teléfono requerido' },
     { id:'aut1-nombre', msg:'1ª persona autorizada requerida' },
     { id:'aut1-dni', msg:'DNI de la 1ª persona autorizada requerido' },
