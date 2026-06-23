@@ -1457,11 +1457,25 @@ function renderTablero(){
     opts.appendChild(lbPub);opts.appendChild(lbUrg);card.appendChild(opts);
   }
   anuncios.forEach(a=>{
-    const div=document.createElement('div');div.className='anuncio-item';div.style.borderLeft='3px solid '+acc();
-    const content=document.createElement('div');
-    content.innerHTML='<div style="font-size:11px;color:#aaa;margin-bottom:3px">'+new Date(a.created_at).toLocaleDateString('es-ES')+' · '+a.autor+'</div>'+
-      '<div style="font-size:13px;color:#333">'+a.texto+'</div>';
-    div.appendChild(content);
+    const colorBorder = a.autor==='Director'?'#5a3e8e':a.autor==='Coordinadora'?'#22c55e':'#f97316';
+    const colorBg = a.autor==='Director'?'#f5f0ff':a.autor==='Coordinadora'?'#f0fdf4':'#fff7ed';
+    const div=document.createElement('div');
+    div.style.cssText='background:'+colorBg+';border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;border-left:4px solid '+colorBorder;
+    const cont=document.createElement('div');cont.style.flex='1';
+    const meta=document.createElement('div');meta.style.cssText='font-size:11px;color:#aaa;margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    meta.innerHTML='<span>📅 '+new Date(a.created_at).toLocaleDateString('es-ES')+'</span>'+
+      '<span style="background:'+colorBorder+';color:#fff;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700">'+a.autor+'</span>'+
+      (a.urgente?'<span style="background:#fff1f2;color:#be123c;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700">🚨 Urgente</span>':'')+
+      (a.publico?'<span style="background:#f0f9ff;color:#0369a1;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700">📢 Familias</span>':'');
+    const txt=document.createElement('div');txt.style.cssText='font-size:13px;color:#333;line-height:1.5';txt.textContent=a.texto;
+    cont.appendChild(meta);cont.appendChild(txt);
+    // Director can mark as public
+    if(rol==='director'&&!a.publico){
+      const bPub=document.createElement('button');bPub.style.cssText='margin-top:8px;background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:600';
+      bPub.textContent='📢 Publicar para familias';bPub.onclick=()=>publicarParaFamilias(a.id);
+      cont.appendChild(bPub);
+    }
+    div.appendChild(cont);
     if(rol==='director'){
       const del=document.createElement('button');del.className='btn-danger';del.textContent='✕';del.onclick=()=>deleteAnuncio(a.id);
       div.appendChild(del);
@@ -1474,14 +1488,11 @@ async function addAnuncioCompleto(inp){
   const texto=inp.value.trim();
   if(!texto)return;
   const autor=rol==='director'?'Director':rol==='coordinadora'?'Coordinadora':'Monitor';
-  const estado=rol==='director'?'aprobado':'pendiente';
-  const publico=el('aviso-publico')?.checked||false;
-  const urgente=el('aviso-urgente')?.checked||false;
-  const {data}=await sb.from('anuncios').insert({texto,autor,estado,publico,urgente}).select().single();
-  if(data){
-    if(estado==='aprobado')anuncios.unshift(data);
-    toast(estado==='aprobado'?'Aviso publicado ✓':'Aviso enviado para aprobación ⏳');
-  }
+  const publico=rol==='director'&&(el('aviso-publico')?.checked||false);
+  const urgente=rol==='director'&&(el('aviso-urgente')?.checked||false);
+  const {data}=await sb.from('anuncios').insert({texto,autor,estado:'aprobado',publico,urgente}).select().single();
+  if(data)anuncios.unshift(data);
+  toast('Aviso publicado ✓');
   inp.value='';renderTablero();
 }
 
@@ -1495,6 +1506,15 @@ async function addAnuncio(texto,inp){
   }
   inp.value='';renderTablero();
 }
+async function publicarParaFamilias(id){
+  const urgente = confirm('¿Marcar como urgente?');
+  await sb.from('anuncios').update({publico:true, urgente}).eq('id',id);
+  const a = anuncios.find(x=>x.id===id);
+  if(a){a.publico=true;a.urgente=urgente;}
+  toast('Aviso publicado para familias ✓');
+  renderTablero();
+}
+
 async function deleteAnuncio(id){
   await sb.from('anuncios').delete().eq('id',id);anuncios=anuncios.filter(a=>a.id!==id);renderTablero();
 }

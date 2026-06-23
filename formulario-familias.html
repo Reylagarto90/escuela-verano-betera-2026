@@ -445,7 +445,7 @@
     <div class="card success-card">
       <div class="success-icon">🎉</div>
       <h2>¡Formulario enviado!</h2>
-      <p style="margin-bottom:16px">Los datos de <strong id="nombre-confirmacion"></strong> han sido enviados correctamente y están <strong>pendientes de revisión</strong> por la organización.</p>
+      <p style="margin-bottom:16px">Los datos de <strong id="nombre-confirmacion"></strong> han sido enviados correctamente y están <strong>pendientes de revisión</strong> por la organización. Si ya tenías un formulario enviado, la organización revisará los cambios.</p>
       <p style="margin-bottom:24px">Recibirás confirmación cuando sean aprobados. Si tienes alguna duda contacta con nosotros en <strong>info@grupotome.es</strong></p>
       <button class="btn-submit" onclick="nuevoFormulario()" style="max-width:300px;margin:0 auto;display:block">Enviar otro formulario</button>
     </div>
@@ -591,6 +591,25 @@ async function enviarFormulario() {
     observaciones: document.getElementById('observaciones').value,
     estado: 'pendiente',
   };
+
+  // Check if there's already a formulario for this participant
+  const { data: existing } = await sb
+    .from('formularios_pendientes')
+    .select('id, estado')
+    .eq('participante_id', participanteSeleccionado)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  const previo = existing && existing.length > 0 ? existing[0] : null;
+
+  if (previo && previo.estado === 'aprobado') {
+    // Mark previous as superseded, new one as actualizacion
+    datos.tipo = 'actualizacion';
+    datos.formulario_previo_id = previo.id;
+  } else if (previo && previo.estado === 'pendiente') {
+    // Replace pending with new one
+    await sb.from('formularios_pendientes').delete().eq('id', previo.id);
+  }
 
   const { error } = await sb.from('formularios_pendientes').insert(datos);
   document.getElementById('loading-overlay').style.display = 'none';
