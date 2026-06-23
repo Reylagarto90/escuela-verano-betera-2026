@@ -228,7 +228,7 @@ function cerrarSesion(){
 // ── DATA ───────────────────────────────────────────────
 async function cargarDatos(){
   el('header-sub').textContent='⏳ Cargando...';
-  const [rP,rA,rF,rT,rAn,rPend,rInc]=await Promise.all([
+  const [rP,rA,rF,rT,rAn,rPend,rInc,rCom]=await Promise.all([
     sb.from('participantes').select('*').order('id'),
     sb.from('asistencia').select('*'),
     sb.from('fichas').select('*'),
@@ -236,12 +236,14 @@ async function cargarDatos(){
     sb.from('anuncios').select('*').order('created_at',{ascending:false}),
     sb.from('formularios_pendientes').select('*').order('created_at',{ascending:false}),
     sb.from('incidencias').select('*').order('created_at',{ascending:false}),
+    sb.from('comunicados').select('*').order('created_at',{ascending:false}),
   ]);
   participantes=rP.data||[];
   tareas=rT.data||[];
   anuncios=rAn.data||[];
   pendientes=rPend.data||[];
   incidencias=rInc.data||[];
+  comunicadosHistorial=rCom.data||[];
   asistencia={};
   (rA.data||[]).forEach(a=>{asistencia[a.participante_id+'-'+a.fecha]=a.presente});
   fichas={};
@@ -1152,29 +1154,76 @@ async function rechazarIncidencia(id){
 
 // ── COMUNICADOS ────────────────────────────────────────
 function renderComunicados(){
-  const emails=pendientes.filter(f=>f.estado==='aprobado'&&f.tutor_email).map(f=>({nombre:f.tutor_nombre+' '+f.tutor_apellidos,email:f.tutor_email,pid:f.participante_id}));
+  const emailsFam = pendientes.filter(f=>f.estado==='aprobado'&&f.tutor_email).map(f=>({
+    nombre:(f.tutor_nombre||'')+' '+(f.tutor_apellidos||''),
+    email:f.tutor_email, pid:f.participante_id,
+    grupo:participantes.find(p=>p.id===f.participante_id)?.grupo||''
+  }));
   const c=el('main-content');c.innerHTML='';
   const card=document.createElement('div');card.className='card';
   card.innerHTML='<h2>📧 Comunicados a familias</h2>';
+
   // Stats
   const sg=document.createElement('div');sg.className='stats-grid';sg.style.marginBottom='20px';
-  [{i:'📧',v:emails.length,l:'Familias con email',bg:'#EEF2FF',co:'#5a3e8e'},{i:'⚠️',v:participantes.length-emails.length,l:'Sin email aún',bg:'#fff1f2',co:'#be123c'}].forEach(s=>{
+  [{i:'📧',v:emailsFam.length,l:'Familias con email',bg:'#EEF2FF',co:'#5a3e8e'},
+   {i:'⚠️',v:participantes.length-emailsFam.length,l:'Sin email aún',bg:'#fff1f2',co:'#be123c'},
+   {i:'📨',v:comunicadosHistorial.length,l:'Comunicados enviados',bg:'#f0fdf4',co:'#15803d'}
+  ].forEach(s=>{
     const d=document.createElement('div');d.className='stat-card';d.style.background=s.bg;
     d.innerHTML='<div style="font-size:20px">'+s.i+'</div><div class="stat-val" style="color:'+s.co+'">'+s.v+'</div><div class="stat-label">'+s.l+'</div>';
     sg.appendChild(d);
   });
   card.appendChild(sg);
-  // Form
-  const form=document.createElement('div');form.style.cssText='background:#f8f9ff;border-radius:12px;padding:18px;border:1px solid #e8eaff;margin-bottom:16px';
-  form.innerHTML='<h3 style="margin:0 0 14px;font-size:14px;color:'+acc()+'">✉️ Nuevo comunicado</h3>';
-  // Destinatarios
-  const dDest=document.createElement('div');dDest.style.marginBottom='12px';
-  dDest.innerHTML='<label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Destinatarios *</label>';
-  const destRow=document.createElement('div');destRow.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+
+  // Tabs nuevo comunicado / historial
+  const tabRow=document.createElement('div');tabRow.style.cssText='display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #f0f0f0';
+  const tabNuevo=document.createElement('button');tabNuevo.style.cssText='padding:8px 16px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;color:#5a3e8e;border-bottom:2px solid #5a3e8e;margin-bottom:-2px';tabNuevo.textContent='✉️ Nuevo comunicado';
+  const tabHist=document.createElement('button');tabHist.style.cssText='padding:8px 16px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;color:#888';tabHist.textContent='📋 Historial ('+comunicadosHistorial.length+')';
+  tabNuevo.onclick=()=>mostrarSeccionCom('nuevo',card,emailsFam);
+  tabHist.onclick=()=>mostrarSeccionCom('historial',card,emailsFam);
+  tabRow.appendChild(tabNuevo);tabRow.appendChild(tabHist);card.appendChild(tabRow);
+
+  const seccion=document.createElement('div');seccion.id='com-seccion';card.appendChild(seccion);
+  c.appendChild(card);
+  mostrarSeccionCom('nuevo',card,emailsFam);
+}
+
+function mostrarSeccionCom(tab, card, emailsFam) {
+  const sec=el('com-seccion');sec.innerHTML='';
+  if(tab==='historial'){
+    mostrarHistorialCom(sec);
+    return;
+  }
+  mostrarFormCom(sec, emailsFam);
+}
+
+function mostrarHistorialCom(sec) {
+  if(comunicadosHistorial.length===0){
+    sec.innerHTML='<p style="color:#aaa;text-align:center;padding:30px">No hay comunicados enviados aún</p>';
+    return;
+  }
+  comunicadosHistorial.forEach(com=>{
+    const d=document.createElement('div');d.style.cssText='border:1px solid #eee;border-radius:12px;padding:14px 16px;margin-bottom:10px';
+    d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">'+
+      '<div><div style="font-weight:700;font-size:14px">'+com.asunto+'</div>'+
+      '<div style="font-size:11px;color:#888">'+new Date(com.created_at).toLocaleDateString('es-ES')+' · '+com.destinatarios+' · Enviado por: '+com.enviado_por+'</div></div>'+
+      '<span class="badge bg-green">✅ '+com.total_enviados+' enviados</span></div>'+
+      '<div style="font-size:13px;color:#555;background:#f8f9ff;padding:10px;border-radius:8px">'+com.mensaje.substring(0,200)+(com.mensaje.length>200?'...':'')+'</div>';
+    sec.appendChild(d);
+  });
+}
+
+function mostrarFormCom(sec, emailsFam) {
   window._destCom='todos';
-  [['todos','👥 Todos ('+emails.length+')'],['Peques','🐣 Peques'],['Medios','🧒 Medios'],['Mayores','🧑 Mayores']].forEach(([g,l])=>{
+  destinSeleccionados=new Set();
+
+  // Destinatarios tabs
+  const dDest=document.createElement('div');dDest.style.marginBottom='14px';
+  dDest.innerHTML='<label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Destinatarios *</label>';
+  const destRow=document.createElement('div');destRow.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px';
+  [['todos','👥 Todos ('+emailsFam.length+')'],['Peques','🐣 Peques'],['Medios','🧒 Medios'],['Mayores','🧑 Mayores'],['individual','👦 Individual']].forEach(([g,l])=>{
     const b=document.createElement('button');
-    b.style.cssText='padding:6px 14px;border-radius:8px;border:2px solid;font-size:12px;font-weight:600;cursor:pointer';
+    b.style.cssText='padding:6px 14px;border-radius:8px;border:2px solid;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s';
     b.style.borderColor=g==='todos'?acc():'#e0e0e0';
     b.style.background=g==='todos'?acc():'#f5f5f5';
     b.style.color=g==='todos'?'#fff':'#555';
@@ -1183,60 +1232,126 @@ function renderComunicados(){
       window._destCom=g;
       destRow.querySelectorAll('button').forEach(btn=>{btn.style.background='#f5f5f5';btn.style.color='#555';btn.style.borderColor='#e0e0e0'});
       b.style.background=acc();b.style.color='#fff';b.style.borderColor=acc();
+      const listaInd=el('lista-individual');
+      if(listaInd)listaInd.style.display=g==='individual'?'block':'none';
     };
     destRow.appendChild(b);
   });
-  dDest.appendChild(destRow);form.appendChild(dDest);
+  dDest.appendChild(destRow);
+
+  // Lista individual con checkboxes
+  const listaInd=document.createElement('div');listaInd.id='lista-individual';listaInd.style.cssText='display:none;background:#f8f9ff;border-radius:10px;padding:12px;max-height:250px;overflow-y:auto;margin-bottom:8px';
+  const selAll=document.createElement('div');selAll.style.cssText='display:flex;justify-content:space-between;margin-bottom:8px';
+  const btnSelAll=document.createElement('button');btnSelAll.style.cssText='font-size:11px;color:#5a3e8e;background:none;border:none;cursor:pointer;font-weight:600';btnSelAll.textContent='Seleccionar todos';
+  btnSelAll.onclick=()=>{
+    emailsFam.forEach(f=>{destinSeleccionados.add(f.email)});
+    listaInd.querySelectorAll('input[type=checkbox]').forEach(cb=>{cb.checked=true});
+    actualizarContadorInd();
+  };
+  const btnDesAll=document.createElement('button');btnDesAll.style.cssText='font-size:11px;color:#888;background:none;border:none;cursor:pointer';btnDesAll.textContent='Deseleccionar todos';
+  btnDesAll.onclick=()=>{
+    destinSeleccionados.clear();
+    listaInd.querySelectorAll('input[type=checkbox]').forEach(cb=>{cb.checked=false});
+    actualizarContadorInd();
+  };
+  const cntSpan=document.createElement('span');cntSpan.id='cnt-ind';cntSpan.style.cssText='font-size:11px;color:#888';cntSpan.textContent='0 seleccionados';
+  selAll.appendChild(btnSelAll);selAll.appendChild(btnDesAll);selAll.appendChild(cntSpan);listaInd.appendChild(selAll);
+  emailsFam.forEach(f=>{
+    const p=participantes.find(x=>x.id===f.pid);
+    const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;cursor:pointer;font-size:13px';
+    const cb=document.createElement('input');cb.type='checkbox';
+    cb.onchange=()=>{
+      if(cb.checked)destinSeleccionados.add(f.email);
+      else destinSeleccionados.delete(f.email);
+      actualizarContadorInd();
+    };
+    row.appendChild(cb);
+    row.innerHTML+=f.nombre+(p&&p.grupo?' <span class="badge '+(p.grupo==='Peques'?'bg-purple':p.grupo==='Medios'?'bg-orange':'bg-green')+'">'+p.grupo+'</span>':'')+' <span style="color:#aaa;font-size:11px">'+f.email+'</span>';
+    listaInd.appendChild(row);
+  });
+  dDest.appendChild(listaInd);
+  sec.appendChild(dDest);
+
   // Asunto
   const dAs=document.createElement('div');dAs.style.marginBottom='12px';
   dAs.innerHTML='<label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Asunto *</label>';
   const inpAs=document.createElement('input');inpAs.type='text';inpAs.id='com-asunto';inpAs.placeholder='Ej: Recordatorio excursión jueves';
-  dAs.appendChild(inpAs);form.appendChild(dAs);
+  inpAs.oninput=actualizarPreviaCom;
+  dAs.appendChild(inpAs);sec.appendChild(dAs);
+
   // Mensaje
   const dMsg=document.createElement('div');dMsg.style.marginBottom='14px';
   dMsg.innerHTML='<label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px">Mensaje *</label>';
   const taMsg=document.createElement('textarea');taMsg.id='com-mensaje';taMsg.rows=5;taMsg.placeholder='Escribe el mensaje para las familias...';taMsg.style.cssText='width:100%;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical';
-  dMsg.appendChild(taMsg);form.appendChild(dMsg);
-  // Botón enviar
-  const btns=document.createElement('div');btns.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap';
-  const bEnv=document.createElement('button');bEnv.className='btn btn-primary';bEnv.style.background=acc();bEnv.textContent='📨 Enviar comunicado';bEnv.onclick=enviarComunicado;
-  const estado=document.createElement('span');estado.id='com-estado';estado.style.cssText='font-size:13px;color:#888';
-  btns.appendChild(bEnv);btns.appendChild(estado);form.appendChild(btns);
-  card.appendChild(form);
+  taMsg.oninput=actualizarPreviaCom;
+  dMsg.appendChild(taMsg);sec.appendChild(dMsg);
+
+  // Vista previa
+  const prevDiv=document.createElement('div');prevDiv.id='com-preview';prevDiv.style.cssText='display:none;margin-bottom:14px;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden';
+  sec.appendChild(prevDiv);
+
+  // Botones
+  const btns=document.createElement('div');btns.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px';
+  const bPrev=document.createElement('button');bPrev.className='btn btn-ghost';bPrev.textContent='👁️ Vista previa';bPrev.onclick=togglePreviaCom;
+  const bEnv=document.createElement('button');bEnv.className='btn btn-primary';bEnv.style.background=acc();bEnv.textContent='📨 Enviar comunicado';bEnv.onclick=confirmarEnvio;
+  const estadoEl=document.createElement('span');estadoEl.id='com-estado';estadoEl.style.cssText='font-size:13px;color:#888';
+  btns.appendChild(bPrev);btns.appendChild(bEnv);btns.appendChild(estadoEl);sec.appendChild(btns);
+
   // Aviso
   const warn=document.createElement('div');warn.className='warn-box';
-  warn.innerHTML='⚠️ Solo se enviarán emails a las <strong>'+emails.length+' familias</strong> con formulario aprobado y email registrado.';
-  card.appendChild(warn);
-  c.appendChild(card);
+  warn.innerHTML='⚠️ Solo se enviarán emails a las <strong>'+emailsFam.length+' familias</strong> con formulario aprobado y email registrado.';
+  sec.appendChild(warn);
 }
 
-function construirEmailHtml(mensaje) {
-  const msgHtml = mensaje.split('\n').join('<br>');
-  return '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">' +
-    '<div style="background:linear-gradient(135deg,#667eea,#f7971e);padding:20px;border-radius:12px 12px 0 0;text-align:center">' +
-    '<h1 style="color:#fff;margin:0;font-size:20px">Escuela de Verano Betera 2026</h1></div>' +
-    '<div style="background:#fff;padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px">' +
-    '<p style="font-size:15px;color:#333;line-height:1.6">' + msgHtml + '</p>' +
-    '<hr style="border:none;border-top:1px solid #eee;margin:20px 0">' +
-    '<p style="font-size:12px;color:#aaa">Escuela de Verano Betera 2026 - Grupo Tome - info@grupotome.es</p>' +
-    '</div></div>';
+function actualizarContadorInd(){
+  const cnt=el('cnt-ind');if(cnt)cnt.textContent=destinSeleccionados.size+' seleccionados';
 }
 
-async function enviarComunicado(){
+function actualizarPreviaCom(){
+  const prev=el('com-preview');if(!prev||prev.style.display==='none')return;
+  const asunto=(el('com-asunto')?.value||'Sin asunto');
+  const mensaje=(el('com-mensaje')?.value||'');
+  prev.innerHTML='<div style="background:#667eea;padding:12px;text-align:center"><strong style="color:#fff;font-size:14px">'+asunto+'</strong></div>'+
+    '<div style="padding:16px;font-size:13px;color:#333;line-height:1.6">'+mensaje.split('\n').join('<br>')+'</div>'+
+    '<div style="padding:10px 16px;background:#f8f8f8;font-size:11px;color:#aaa">Escuela de Verano Bétera 2026 · Grupo Tome · info@grupotome.es</div>';
+}
+
+function togglePreviaCom(){
+  const prev=el('com-preview');if(!prev)return;
+  if(prev.style.display==='none'){prev.style.display='block';actualizarPreviaCom()}
+  else prev.style.display='none';
+}
+
+async function confirmarEnvio(){
   const asunto=(el('com-asunto')?.value||'').trim();
   const mensaje=(el('com-mensaje')?.value||'').trim();
   const dest=window._destCom||'todos';
   if(!asunto||!mensaje){alert('Rellena el asunto y el mensaje');return}
-  const emailsList=pendientes.filter(f=>{
-    if(f.estado!=='aprobado'||!f.tutor_email)return false;
-    if(dest==='todos')return true;
-    const p=participantes.find(x=>x.id===f.participante_id);
-    return p&&p.grupo===dest;
-  }).map(f=>f.tutor_email);
-  if(emailsList.length===0){alert('No hay emails para este grupo');return}
-  const estadoEl=el('com-estado');estadoEl.textContent='⏳ Enviando a '+emailsList.length+' familias...';
+
+  const emailsFam=pendientes.filter(f=>f.estado==='aprobado'&&f.tutor_email).map(f=>({
+    email:f.tutor_email,pid:f.participante_id,
+    grupo:participantes.find(p=>p.id===f.participante_id)?.grupo||''
+  }));
+
+  let lista=[];
+  if(dest==='individual'){lista=emailsFam.filter(f=>destinSeleccionados.has(f.email))}
+  else if(dest==='todos'){lista=emailsFam}
+  else{lista=emailsFam.filter(f=>f.grupo===dest)}
+
+  if(lista.length===0){alert('No hay destinatarios seleccionados');return}
+
+  const confirmar=confirm('¿Enviar "'+asunto+'" a '+lista.length+' familia'+(lista.length>1?'s':'')+'?');
+  if(!confirmar)return;
+
+  await enviarComunicado(lista,asunto,mensaje,dest);
+}
+
+async function enviarComunicado(lista,asunto,mensaje,dest){
+  const estadoEl=el('com-estado');
+  if(estadoEl)estadoEl.textContent='⏳ Enviando a '+lista.length+' familias...';
   let ok=0,err=0;
-  for(const email of emailsList){
+  for(const f of lista){
+    const email=f.email||f;
     try{
       const res=await fetch(EDGE_EMAIL,{
         method:'POST',
@@ -1250,7 +1365,13 @@ async function enviarComunicado(){
       if(res.ok)ok++;else err++;
     }catch(e){err++}
   }
-  estadoEl.textContent='✅ Enviados: '+ok+(err>0?' · ❌ Errores: '+err:'');
+  if(estadoEl)estadoEl.textContent='✅ Enviados: '+ok+(err>0?' · ❌ Errores: '+err:'');
+  // Guardar en historial
+  const destLabel=dest==='todos'?'Todos':dest==='individual'?'Selección individual':dest;
+  const {data}=await sb.from('comunicados').insert({
+    asunto,mensaje,destinatarios:destLabel,total_enviados:ok,errores:err,enviado_por:rol
+  }).select().single();
+  if(data)comunicadosHistorial.unshift(data);
   toast('Comunicado enviado a '+ok+' familias ✓');
 }
 
