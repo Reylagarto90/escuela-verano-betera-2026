@@ -489,9 +489,11 @@ function renderAsistencia() {
   // Filtro por grupo (no para monitor)
   if (rol !== 'monitor') {
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
-    grupos.forEach(g => {
-      const cnt = g === 'todos' ? participantes.length : participantes.filter(p=>(p.grupo||'')===g).length;
-      html += '<button onclick="filtroGrupoAsis='' + g + '';renderAsistencia()" style="padding:5px 12px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:' + (filtroGrupoAsis===g?acc:'#f0f0f0') + ';color:' + (filtroGrupoAsis===g?'#fff':'#555') + '">' + etiquetas[g] + ' (' + cnt + ')</button>';
+    grupos.forEach(function(g, idx) {
+      const cnt = g === 'todos' ? participantes.length : participantes.filter(function(p){return (p.grupo||'')===g;}).length;
+      const bg = filtroGrupoAsis===g ? acc : '#f0f0f0';
+      const col = filtroGrupoAsis===g ? '#fff' : '#555';
+      html += '<button onclick="setFiltroGrupo(' + idx + ')" style="padding:5px 12px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:' + bg + ';color:' + col + '">' + etiquetas[g] + ' (' + cnt + ')</button>';
     });
     html += '</div>';
   }
