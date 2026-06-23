@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escuela de Verano · Bétera 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════
+// CREDENCIALES — abre con Bloc de notas
+// y sustituye TU_URL_AQUI y TU_KEY_AQUI
+// ══════════════════════════════════════════
+const SUPABASE_URL = 'https://wxhsyfqlrfpgtzwtwqrk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4aHN5ZnFscmZwZ3R6d3R3cXJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTUxMzAsImV4cCI6MjA5Nzc3MTEzMH0.qmLr4HsWGjdOfpPOj7gwaEDd-vpS7_ZZ-IH1YseT_F0';
+const PINS = { director: '1234', coordinadora: '0000' };
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Segoe UI, system-ui, sans-serif; background: #f4f6fb; min-height: 100vh; }
+
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#667eea,#f7971e); padding:20px; }
+  .login-box { background:#fff; border-radius:20px; padding:36px; width:100%; max-width:360px; box-shadow:0 20px 60px rgba(0,0,0,.15); text-align:center; }
+  .login-box h1 { font-size:20px; font-weight:800; color:#1e1e2e; margin-bottom:4px; }
+  .login-box p.sub { color:#888; font-size:13px; margin-bottom:28px; }
+  .rol-btn { display:block; width:100%; padding:14px; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-bottom:12px; }
+  .rol-director { border:2px solid #5a3e8e; background:#f5f0ff; color:#5a3e8e; }
+  .rol-coord { border:2px solid #0ea5e9; background:#f0f9ff; color:#0369a1; }
+  .pin-input { width:100%; padding:12px 16px; font-size:22px; letter-spacing:8px; border:2px solid #e0e0e0; border-radius:12px; text-align:center; outline:none; margin-bottom:8px; }
+  .pin-input.error { border-color:#ef4444; background:#fff5f5; }
+  .pin-error { color:#ef4444; font-size:12px; margin-bottom:8px; display:none; }
+  .btn-entrar { width:100%; padding:12px; border-radius:12px; border:none; color:#fff; font-weight:700; font-size:15px; cursor:pointer; }
+  .btn-volver { background:none; border:none; color:#888; cursor:pointer; font-size:13px; margin-bottom:14px; }
+  .pin-hint { font-size:11px; color:#bbb; margin-top:10px; }
+
+  #app-screen { display:none; }
+  .header { padding:14px 18px 0; }
+  .header-inner { max-width:960px; margin:0 auto; }
+  .header-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .header-title { color:#fff; font-weight:800; font-size:15px; }
+  .header-sub { color:rgba(255,255,255,.8); font-size:11px; }
+  .btn-salir { background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:8px; padding:5px 11px; cursor:pointer; font-size:12px; }
+  .tabs { display:flex; gap:2px; overflow-x:auto; }
+  .tab-btn { padding:7px 13px; border-radius:8px 8px 0 0; border:none; font-weight:500; cursor:pointer; font-size:12px; white-space:nowrap; color:#fff; background:rgba(255,255,255,.15); transition:all .15s; }
+  .tab-btn.active { background:#fff; font-weight:700; }
+
+  .content { max-width:960px; margin:0 auto; padding:18px 14px; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.05); margin-bottom:14px; }
+  .card h2 { font-size:17px; color:#333; margin-bottom:14px; }
+  .card h3 { font-size:14px; color:#333; margin-bottom:10px; }
+
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:16px; }
+  .stat-card { border-radius:14px; padding:14px 16px; }
+  .stat-val { font-size:22px; font-weight:800; }
+  .stat-label { font-size:11px; color:#777; margin-top:2px; }
+
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { padding:8px 10px; text-align:left; color:#666; background:#f8f9ff; }
+  td { padding:8px 10px; border-bottom:1px solid #f5f5f5; }
+  th.center, td.center { text-align:center; }
+
+  .badge { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .badge-green  { background:#f0fdf4; color:#15803d; }
+  .badge-orange { background:#fff7ed; color:#c2410c; }
+  .badge-yellow { background:#fef9c3; color:#a16207; }
+  .badge-red    { background:#fff1f2; color:#be123c; }
+  .badge-purple { background:#EEF2FF; color:#5a3e8e; }
+  .badge-blue   { background:#f0f9ff; color:#0369a1; }
+
+  input[type=text], input[type=date], select, textarea { width:100%; padding:8px 12px; border:1px solid #e0e0e0; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; }
+  textarea { resize:vertical; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-weight:700; font-size:13px; color:#444; margin-bottom:6px; }
+  .btn { padding:8px 16px; border-radius:8px; border:none; font-size:13px; cursor:pointer; font-weight:600; }
+  .btn-primary { color:#fff; }
+  .btn-ghost { background:#f5f5f5; color:#666; }
+  .btn-danger { background:none; border:none; cursor:pointer; color:#ddd; font-size:14px; }
+
+  .asis-btn { width:30px; height:30px; border-radius:7px; border:none; cursor:pointer; font-size:14px; transition:background .15s; }
+  .asis-presente  { background:#bbf7d0; color:#15803d; }
+  .asis-ausente   { background:#f5f5f5; color:#ddd; }
+  .asis-noaplica  { background:#f0f0f0; color:#ccc; cursor:default; }
+
+  .semana-tabs { display:flex; gap:5px; flex-wrap:wrap; }
+  .semana-btn { padding:5px 10px; border-radius:8px; border:none; font-size:11px; font-weight:600; cursor:pointer; }
+
+  .tarea-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; margin-bottom:5px; }
+  .tarea-alta  { background:#fff5f5; border:1px solid #fca5a5; }
+  .tarea-media { background:#fffbe6; border:1px solid #fde68a; }
+  .tarea-baja  { background:#f0fff4; border:1px solid #86efac; }
+  .tarea-hecha { background:#fafafa; border:1px solid #eee; }
+
+  .ficha-item { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-radius:10px; cursor:pointer; margin-bottom:6px; }
+  .ficha-ok       { background:#f0fdf4; border:1px solid #bbf7d0; }
+  .ficha-pendiente { background:#fff9f9; border:1px solid #fecaca; }
+
+  .progress-bar { background:#f0f0f0; border-radius:8px; height:8px; margin-bottom:16px; overflow:hidden; }
+  .progress-fill { background:#22c55e; height:100%; border-radius:8px; transition:width .4s; }
+
+  .anuncio-item { background:#f8f9ff; border-radius:10px; padding:12px 14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:flex-start; }
+  .anuncio-meta { font-size:11px; color:#aaa; margin-bottom:3px; }
+
+  .grupos-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+  .periodo-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .periodo-btn { padding:6px 12px; border-radius:8px; border:none; font-size:12px; font-weight:600; cursor:pointer; }
+
+  #loading { position:fixed; inset:0; background:linear-gradient(135deg,#667eea,#f7971e); display:flex; align-items:center; justify-content:center; z-index:999; }
+  #toast { position:fixed; bottom:24px; right:24px; background:#1e1e2e; color:#fff; padding:10px 18px; border-radius:10px; font-size:13px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9999; }
+  #toast.show { opacity:1; }
+
+  @media(max-width:600px) { .form-row{grid-template-columns:1fr} .content{padding:12px 10px} }
+  @media print { .header,.tabs,.btn-salir,#toast{display:none!important} .content{padding:0} }
+</style>
+</head>
+<body>
+
+<div id="loading"><span style="color:#fff;font-size:16px;font-weight:600">⏳ Conectando...</span></div>
+
+<div id="login-screen" style="display:none">
+  <div class="login-box">
+    <div style="font-size:48px;margin-bottom:8px">☀️</div>
+    <h1>Escuela de Verano</h1>
+    <p class="sub">Bétera 2026 · Julio</p>
+    <div id="login-roles">
+      <p style="font-weight:600;color:#444;margin-bottom:14px;font-size:14px">¿Quién eres?</p>
+      <button class="rol-btn rol-director" onclick="seleccionarRol('director')">🏛️ Director / Administración</button>
+      <button class="rol-btn rol-coord" onclick="seleccionarRol('coordinadora')">📋 Coordinadora</button>
+    </div>
+    <div id="login-pin" style="display:none">
+      <button class="btn-volver" onclick="volverRoles()">← Cambiar rol</button>
+      <p id="pin-label" style="font-weight:600;color:#444;margin-bottom:8px;font-size:14px"></p>
+      <input type="password" class="pin-input" id="pin-input" placeholder="PIN" maxlength="10" onkeydown="if(event.key==='Enter')verificarPin()">
+      <p id="pin-error" class="pin-error">PIN incorrecto, inténtalo de nuevo</p>
+      <button class="btn-entrar btn-primary" id="btn-entrar" onclick="verificarPin()">Entrar</button>
+      <p class="pin-hint">PIN demo: Director → 1234 · Coordinadora → 0000</p>
+    </div>
+  </div>
+</div>
+
+<div id="app-screen">
+  <div class="header" id="app-header">
+    <div class="header-inner">
+      <div class="header-top">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:24px">☀️</span>
+          <div>
+            <div class="header-title">Escuela de Verano · Bétera 2026</div>
+            <div class="header-sub" id="header-sub"></div>
+          </div>
+        </div>
+        <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
+      </div>
+      <div class="tabs" id="tabs-container"></div>
+    </div>
+  </div>
+  <div class="content" id="main-content"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SEMANAS = [
+  { label:'S1', full:'Semana 1', dates:'1–4 jul',   days:['2026-07-01','2026-07-02','2026-07-03','2026-07-04'], labels:['Mié 1','Jue 2','Vie 3','Sáb 4'] },
+  { label:'S2', full:'Semana 2', dates:'7–10 jul',  days:['2026-07-07','2026-07-08','2026-07-09','2026-07-10'], labels:['Mar 7','Mié 8','Jue 9','Vie 10'] },
+  { label:'S3', full:'Semana 3', dates:'13–17 jul', days:['2026-07-13','2026-07-14','2026-07-15','2026-07-16','2026-07-17'], labels:['Lun 13','Mar 14','Mié 15','Jue 16','Vie 17'] },
+  { label:'S4', full:'Semana 4', dates:'20–24 jul', days:['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24'], labels:['Lun 20','Mar 21','Mié 22','Jue 23','Vie 24'] },
+  { label:'S5', full:'Semana 5', dates:'27–31 jul', days:['2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31'], labels:['Lun 27','Mar 28','Mié 29','Jue 30','Vie 31'] },
+];
+const PERIODOS_INFORME = [
+  { key:'s1',  label:'Semana 1',           semanas:[0] },
+  { key:'s2',  label:'Semana 2',           semanas:[1] },
+  { key:'s3',  label:'Semana 3',           semanas:[2] },
+  { key:'s4',  label:'Semana 4',           semanas:[3] },
+  { key:'s5',  label:'Semana 5',           semanas:[4] },
+  { key:'q1',  label:'Quincena 1 (1–15)',  semanas:[0,1,2] },
+  { key:'q2',  label:'Quincena 2 (16–31)', semanas:[3,4] },
+  { key:'mes', label:'Mes completo',        semanas:[0,1,2,3,4] },
+];
+
+let sb, rol, tabActual, semanaActual=0, informePeriodo='mes';
+let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[];
+
+async function init() {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function seleccionarRol(r) {
+  rol = r;
+  document.getElementById('login-roles').style.display = 'none';
+  document.getElementById('login-pin').style.display = 'block';
+  document.getElementById('pin-label').textContent = (r==='director'?'🏛️ Director':'📋 Coordinadora') + ' · Introduce tu PIN';
+  document.getElementById('btn-entrar').style.background = r==='director' ? '#5a3e8e' : '#0ea5e9';
+  document.getElementById('pin-input').focus();
+}
+
+function volverRoles() {
+  document.getElementById('login-roles').style.display = 'block';
+  document.getElementById('login-pin').style.display = 'none';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').style.display = 'none';
+}
+
+async function verificarPin() {
+  const pin = document.getElementById('pin-input').value;
+  if (pin === PINS[rol]) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    await cargarDatos();
+    renderHeader();
+    mostrarTab(rol==='director' ? 'dashboard' : 'asistencia');
+  } else {
+    const inp = document.getElementById('pin-input');
+    inp.classList.add('error');
+    document.getElementById('pin-error').style.display = 'block';
+    inp.value = '';
+    setTimeout(() => { inp.classList.remove('error'); document.getElementById('pin-error').style.display='none'; }, 1500);
+  }
+}
+
+function cerrarSesion() {
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  volverRoles();
+}
+
+async function cargarDatos() {
+  document.getElementById('header-sub').textContent = '⏳ Cargando...';
+  const [rP,rA,rF,rT,rAn] = await Promise.all([
+    sb.from('participantes').select('*').order('id'),
+    sb.from('asistencia').select('*'),
+    sb.from('fichas').select('*'),
+    sb.from('tareas').select('*').order('id'),
+    sb.from('anuncios').select('*').order('created_at',{ascending:false}),
+  ]);
+  participantes = rP.data || [];
+  tareas        = rT.data || [];
+  anuncios      = rAn.data || [];
+  asistencia = {};
+  (rA.data||[]).forEach(a => { asistencia[a.participante_id+'-'+a.fecha] = a.presente; });
+  fichas = {};
+  (rF.data||[]).forEach(f => { fichas[f.participante_id] = f; });
+  document.getElementById('header-sub').textContent = (rol==='director'?'🏛️ Director':'📋 Coordinadora') + ' · ☁️ sincronizado';
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function renderHeader() {
+  const acc = rol==='director' ? '#5a3e8e' : '#0ea5e9';
+  document.getElementById('app-header').style.background = `linear-gradient(135deg,${acc},#f7971e)`;
+  const tabsDir = [
+    {key:'dashboard',    label:'📊 Inicio'},
+    {key:'participantes',label:'👦 Participantes'},
+    {key:'grupos',       label:'👥 Grupos'},
+    {key:'asistencia',   label:'✅ Asistencia'},
+    {key:'fichas',       label:'🏥 Fichas'},
+    {key:'tareas',       label:'📋 Tareas'},
+    {key:'informes',     label:'📈 Informes'},
+    {key:'tablero',      label:'📢 Tablero'},
+  ];
+  const tabsCoord = [
+    {key:'asistencia',label:'✅ Pasar lista'},
+    {key:'grupos',    label:'👥 Grupos'},
+    {key:'fichas',    label:'🏥 Fichas'},
+    {key:'tablero',   label:'📢 Tablero'},
+  ];
+  const tabs = rol==='director' ? tabsDir : tabsCoord;
+  document.getElementById('tabs-container').innerHTML = tabs.map(t =>
+    `<button class="tab-btn${tabActual===t.key?' active':''}" id="tab-${t.key}" onclick="mostrarTab('${t.key}')" style="${tabActual===t.key?'color:'+acc:''}">${t.label}</button>`
+  ).join('');
+}
+
+function mostrarTab(key) {
+  tabActual = key;
+  renderHeader();
+  const renders = {dashboard:renderDashboard,participantes:renderParticipantes,grupos:renderGrupos,asistencia:renderAsistencia,fichas:renderFichas,tareas:renderTareas,informes:renderInformes,tablero:renderTablero};
+  if (renders[key]) renders[key]();
+}
+
+function noAsiste(p, fecha) {
+  const t = p.temporalidad;
+  const s4dias = ['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24'];
+  const s5dias = SEMANAS[4].days;
+  const jorgedias = ['2026-07-07','2026-07-08','2026-07-09','2026-07-10','2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'];
+  if (t==='3 primeras semanas' && (s4dias.includes(fecha)||s5dias.includes(fecha))) return true;
+  if (t==='6-10 jul y 20-25 jul' && !jorgedias.includes(fecha)) return true;
+  return false;
+}
+
+function tempBadge(t) {
+  if (t==='Mes completo') return '<span class="badge badge-green">Mes completo</span>';
+  if (t==='3 primeras semanas') return '<span class="badge badge-orange">3 primeras semanas</span>';
+  return `<span class="badge badge-yellow">${t}</span>`;
+}
+function grupoBadge(g) {
+  if (!g) return '<span style="color:#ccc;font-size:11px">—</span>';
+  const cls = g==='Peques'?'badge-purple':g==='Medios'?'badge-orange':'badge-green';
+  return `<span class="badge ${cls}">${g}</span>`;
+}
+function pctColor(p) { return p===null?'#ccc':p>=80?'#15803d':p>=50?'#c2410c':'#be123c'; }
+function pctBg(p)    { return p===null?'#f5f5f5':p>=80?'#f0fdf4':p>=50?'#fff7ed':'#fff1f2'; }
+
+// DASHBOARD
+function renderDashboard() {
+  const fichasOk = participantes.filter(p => fichas[p.id]?.ficha_completa).length;
+  const tHechas  = tareas.filter(t => t.hecha).length;
+  const urgentes = tareas.filter(t => !t.hecha && t.prioridad==='alta');
+  const pendientes = participantes.filter(p => !fichas[p.id]?.ficha_completa);
+  document.getElementById('main-content').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card" style="background:#EEF2FF"><div style="font-size:20px">👦</div><div class="stat-val" style="color:#5a3e8e">${participantes.length}</div><div class="stat-label">Participantes</div></div>
+      <div class="stat-card" style="background:#f0fdf4"><div style="font-size:20px">🏥</div><div class="stat-val" style="color:#15803d">${fichasOk}/${participantes.length}</div><div class="stat-label">Fichas completas</div></div>
+      <div class="stat-card" style="background:#fff7ed"><div style="font-size:20px">📋</div><div class="stat-val" style="color:#c2410c">${tHechas}/${tareas.length}</div><div class="stat-label">Tareas hechas</div></div>
+      <div class="stat-card" style="background:#fff1f2"><div style="font-size:20px">🚨</div><div class="stat-val" style="color:#be123c">${urgentes.length}</div><div class="stat-label">Urgentes</div></div>
+    </div>
+    <div class="card">
+      <h3>🏥 Fichas pendientes de recoger</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${pendientes.length===0 ? '<span style="color:#aaa;font-size:13px">¡Todas completas! ✓</span>' : pendientes.slice(0,14).map(p=>`<span class="badge badge-red" style="cursor:pointer" onclick="abrirFicha(${p.id})">${p.nombre.split(' ').slice(0,2).join(' ')}</span>`).join('')}
+        ${pendientes.length>14 ? `<span style="color:#aaa;font-size:11px">+${pendientes.length-14} más</span>` : ''}
+      </div>
+    </div>
+    <div class="card">
+      <h3>🚨 Tareas urgentes pendientes</h3>
+      ${urgentes.length===0 ? '<p style="color:#aaa;font-size:13px">¡Todo en orden!</p>' :
+        urgentes.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
+          <input type="checkbox" onchange="toggleTarea(${t.id})">
+          <span style="font-size:13px;color:#be123c">${t.texto}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// PARTICIPANTES
+function renderParticipantes() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <h2 style="margin:0">👦 Participantes (${participantes.length})</h2>
+        <input type="text" id="busqueda" placeholder="🔍 Buscar..." style="width:180px" oninput="filtrarParticipantes()">
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>#</th><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Período</th><th class="center">Grupo</th><th class="center">Ficha</th></tr></thead>
+          <tbody id="tabla-participantes">${participantes.map((p,i)=>filaP(p,i+1)).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+function filaP(p,i) {
+  const ok = fichas[p.id]?.ficha_completa;
+  return `<tr>
+    <td style="color:#bbb;font-size:11px">${i}</td>
+    <td style="font-weight:600">${p.nombre}</td>
+    <td>${p.contacto||'—'}</td>
+    <td style="font-family:monospace;font-size:11px">${p.telefono||'—'}</td>
+    <td>${tempBadge(p.temporalidad)}</td>
+    <td class="center">${grupoBadge(p.grupo)}</td>
+    <td class="center"><button class="badge ${ok?'badge-green':'badge-red'}" style="cursor:pointer;border:none" onclick="abrirFicha(${p.id})">${ok?'✓ OK':'⚠️ Pendiente'}</button></td>
+  </tr>`;
+}
+function filtrarParticipantes() {
+  const q = document.getElementById('busqueda').value.toLowerCase();
+  document.getElementById('tabla-participantes').innerHTML = participantes.filter(p=>p.nombre.toLowerCase().includes(q)).map((p,i)=>filaP(p,i+1)).join('');
+}
+
+// GRUPOS
+function renderGrupos() {
+  const grupos = ['Peques','Medios','Mayores',''];
+  const etiquetas = {Peques:'🐣 Peques',Medios:'🧒 Medios',Mayores:'🧑 Mayores','':'❓ Sin grupo'};
+  const colores = {Peques:'#EEF2FF',Medios:'#FFF7ED',Mayores:'#F0FDF4','':'#f8f8f8'};
+  document.getElementById('main-content').innerHTML = `
+    <div class="grupos-grid">
+      ${grupos.map(g => {
+        const lista = participantes.filter(p=>(p.grupo||'')===g);
+        if (g==='' && lista.length===0) return '';
+        return `<div class="card" style="background:${colores[g]}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 style="margin:0">${etiquetas[g]}</h3>
+            <span class="badge badge-purple">${lista.length}</span>
+          </div>
+          ${lista.length===0?'<p style="color:#ccc;font-size:12px">Ningún participante aún</p>':
+            lista.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+              <span style="font-size:13px;font-weight:600">${p.nombre}</span>
+              ${rol==='director'?`<select style="width:auto;font-size:11px;padding:3px 6px" onchange="cambiarGrupo(${p.id},this.value)">
+                <option value="" ${!p.grupo?'selected':''}>Sin grupo</option>
+                <option value="Peques" ${p.grupo==='Peques'?'selected':''}>Peques</option>
+                <option value="Medios" ${p.grupo==='Medios'?'selected':''}>Medios</option>
+                <option value="Mayores" ${p.grupo==='Mayores'?'selected':''}>Mayores</option>
+              </select>`:grupoBadge(p.grupo)}
+            </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="background:#f8f9ff;border-radius:12px;padding:12px 16px;margin-top:14px;font-size:12px;color:#888">
+      💡 Asigna grupos desde aquí o desde las fichas. Los cambios se guardan automáticamente en Supabase.
+    </div>`;
+}
+async function cambiarGrupo(id,grupo) {
+  await sb.from('participantes').update({grupo}).eq('id',id);
+  const p = participantes.find(x=>x.id===id);
+  if (p) p.grupo = grupo;
+  toast('Grupo actualizado ✓');
+  renderGrupos();
+}
+
+// ASISTENCIA
+function renderAsistencia() {
+  const week = SEMANAS[semanaActual];
+  const acc = rol==='director'?'#5a3e8e':'#0ea5e9';
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <h2 style="margin:0">${rol==='director'?'✅ Asistencia':'✅ Pasar lista'}</h2>
+        <div class="semana-tabs">
+          ${SEMANAS.map((s,i)=>`<button class="semana-btn" onclick="cambiarSemana(${i})" style="background:${semanaActual===i?acc:'#f0f0f0'};color:${semanaActual===i?'#fff':'#555'}">${s.label}</button>`).join('')}
+        </div>
+      </div>
+      <p style="color:#888;font-size:12px;margin-bottom:12px">${week.full} · ${week.dates}</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th style="min-width:155px">Nombre</th>
+            ${week.labels.map(l=>`<th class="center" style="min-width:44px">${l}</th>`).join('')}
+            <th class="center">∑</th>
+          </tr></thead>
+          <tbody>
+            ${participantes.map(p => {
+              const total = week.days.filter(d=>!noAsiste(p,d)&&asistencia[p.id+'-'+d]).length;
+              return `<tr>
+                <td>
+                  <div style="font-weight:600;font-size:12px">${p.nombre}</div>
+                  <div style="display:flex;gap:4px;margin-top:2px;flex-wrap:wrap">${tempBadge(p.temporalidad)}${p.grupo?grupoBadge(p.grupo):''}</div>
+                </td>
+                ${week.days.map(d=>{
+                  const na=noAsiste(p,d); const pres=asistencia[p.id+'-'+d];
+                  return `<td class="center"><button class="asis-btn ${na?'asis-noaplica':pres?'asis-presente':'asis-ausente'}" ${na?'disabled':''} onclick="toggleAsistencia(${p.id},'${d}')">${na?'–':pres?'✓':''}</button></td>`;
+                }).join('')}
+                <td class="center" style="font-weight:700;font-size:12px;color:${total>0?'#15803d':'#ccc'}">${total}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+function cambiarSemana(i) { semanaActual=i; renderAsistencia(); }
+async function toggleAsistencia(pid,fecha) {
+  const key = pid+'-'+fecha;
+  const actual = asistencia[key]||false;
+  asistencia[key] = !actual;
+  renderAsistencia();
+  await sb.from('asistencia').upsert({participante_id:pid,fecha,presente:!actual},{onConflict:'participante_id,fecha'});
+}
+
+// FICHAS
+function renderFichas() {
+  const total = participantes.length;
+  const ok = participantes.filter(p=>fichas[p.id]?.ficha_completa).length;
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h2 style="margin:0">🏥 Fichas médicas</h2>
+        <span style="font-size:13px;color:#888"><strong style="color:#15803d">${ok}</strong> / ${total}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${(ok/total)*100}%"></div></div>
+      ${participantes.map(p=>{
+        const o=fichas[p.id]?.ficha_completa;
+        return `<div class="ficha-item ${o?'ficha-ok':'ficha-pendiente'}" onclick="abrirFicha(${p.id})">
+          <div>
+            <div style="font-weight:600;font-size:13px">${p.nombre}</div>
+            <div style="font-size:11px;color:#888">${p.contacto} · ${p.telefono} ${p.grupo?grupoBadge(p.grupo):''}</div>
+          </div>
+          <span class="badge ${o?'badge-green':'badge-red'}">${o?'✓ Completa':'⚠️ Pendiente'}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+function abrirFicha(pid) {
+  const p = participantes.find(x=>x.id===pid);
+  const f = fichas[pid]||{};
+  const acc = rol==='director'?'#5a3e8e':'#0ea5e9';
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <button class="btn btn-ghost" onclick="renderFichas()" style="margin-bottom:14px">← Volver</button>
+      <h2 style="margin-bottom:4px">🏥 ${p.nombre}</h2>
+      <p style="color:#888;font-size:12px;margin-bottom:20px">Contacto: ${p.contacto} · ${p.telefono}</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>🎂 Fecha de nacimiento</label>
+          <input type="date" id="f-fechanac" value="${p.fecha_nac||''}">
+          <p id="edad-label" style="font-size:12px;color:#5a3e8e;font-weight:600;margin-top:4px">${p.fecha_nac?calcEdad(p.fecha_nac)+' años en julio 2026':''}</p>
+        </div>
+        <div class="form-group">
+          <label>👥 Grupo</label>
+          <select id="f-grupo">
+            <option value="" ${!p.grupo?'selected':''}>Sin asignar</option>
+            <option value="Peques" ${p.grupo==='Peques'?'selected':''}>🐣 Peques</option>
+            <option value="Medios" ${p.grupo==='Medios'?'selected':''}>🧒 Medios</option>
+            <option value="Mayores" ${p.grupo==='Mayores'?'selected':''}>🧑 Mayores</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>🌿 Alergias / intolerancias</label><textarea id="f-alergias" rows="3" placeholder="Ej: alergia al gluten...">${f.alergias||''}</textarea></div>
+      <div class="form-group"><label>💊 Medicación y condiciones médicas</label><textarea id="f-medicacion" rows="3" placeholder="Ej: asma, toma Ventolin...">${f.medicacion||''}</textarea></div>
+      <div class="form-group"><label>📝 Observaciones generales</label><textarea id="f-observaciones" rows="3" placeholder="Cualquier info relevante para monitores...">${f.observaciones||''}</textarea></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" style="flex:1;background:${acc}" onclick="guardarFicha(${pid})">💾 Guardar ficha</button>
+        <button class="btn btn-ghost" onclick="renderFichas()">Cancelar</button>
+      </div>
+    </div>`;
+  document.getElementById('f-fechanac').addEventListener('change',function(){
+    document.getElementById('edad-label').textContent = this.value ? calcEdad(this.value)+' años en julio 2026' : '';
+  });
+}
+function calcEdad(fn) {
+  const ref=new Date(2026,6,1), nac=new Date(fn);
+  let e=ref.getFullYear()-nac.getFullYear();
+  const m=ref.getMonth()-nac.getMonth();
+  if(m<0||(m===0&&ref.getDate()<nac.getDate()))e--;
+  return e;
+}
+async function guardarFicha(pid) {
+  const fechaNac=document.getElementById('f-fechanac').value;
+  const grupo=document.getElementById('f-grupo').value;
+  const alergias=document.getElementById('f-alergias').value;
+  const medicacion=document.getElementById('f-medicacion').value;
+  const observaciones=document.getElementById('f-observaciones').value;
+  const fichaCompleta=!!(alergias||medicacion||observaciones||fechaNac);
+  await Promise.all([
+    sb.from('participantes').update({fecha_nac:fechaNac||null,grupo}).eq('id',pid),
+    sb.from('fichas').update({alergias,medicacion,observaciones,ficha_completa:fichaCompleta,updated_at:new Date().toISOString()}).eq('participante_id',pid),
+  ]);
+  const p=participantes.find(x=>x.id===pid);
+  if(p){p.fecha_nac=fechaNac;p.grupo=grupo;}
+  if(fichas[pid])fichas[pid]={...fichas[pid],alergias,medicacion,observaciones,ficha_completa:fichaCompleta};
+  toast('Ficha guardada ✓');
+  renderFichas();
+}
+
+// TAREAS
+function renderTareas() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <h2>📋 Tareas</h2>
+      <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+        <input type="text" id="nueva-tarea" placeholder="Nueva tarea..." style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')addTarea()">
+        <select id="nueva-prioridad" style="width:auto">
+          <option value="alta">🔴 Alta</option>
+          <option value="media" selected>🟡 Media</option>
+          <option value="baja">🟢 Baja</option>
+        </select>
+        <button class="btn btn-primary" style="background:#5a3e8e" onclick="addTarea()">+ Añadir</button>
+      </div>
+      ${['alta','media','baja'].map(p=>{
+        const grupo=tareas.filter(t=>t.prioridad===p);
+        if(!grupo.length)return '';
+        const label=p==='alta'?'🔴 Urgente':p==='media'?'🟡 Normal':'🟢 Cuando pueda';
+        return `<div style="margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">${label}</div>
+          ${grupo.map(t=>`<div class="tarea-item ${t.hecha?'tarea-hecha':'tarea-'+p}">
+            <input type="checkbox" ${t.hecha?'checked':''} onchange="toggleTarea(${t.id})">
+            <span style="flex:1;font-size:13px;text-decoration:${t.hecha?'line-through':'none'};color:${t.hecha?'#aaa':'#333'}">${t.texto}</span>
+            <button class="btn-danger" onclick="deleteTarea(${t.id})">✕</button>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+async function addTarea() {
+  const texto=document.getElementById('nueva-tarea').value.trim();
+  const prioridad=document.getElementById('nueva-prioridad').value;
+  if(!texto)return;
+  const {data}=await sb.from('tareas').insert({texto,prioridad,hecha:false}).select().single();
+  if(data)tareas.push(data);
+  renderTareas();
+}
+async function toggleTarea(id) {
+  const t=tareas.find(x=>x.id===id);
+  if(!t)return;
+  t.hecha=!t.hecha;
+  await sb.from('tareas').update({hecha:t.hecha}).eq('id',id);
+  if(tabActual==='tareas')renderTareas(); else renderDashboard();
+}
+async function deleteTarea(id) {
+  await sb.from('tareas').delete().eq('id',id);
+  tareas=tareas.filter(t=>t.id!==id);
+  renderTareas();
+}
+
+// INFORMES
+function renderInformes() {
+  const pd=PERIODOS_INFORME.find(p=>p.key===informePeriodo);
+  const diasPeriodo=pd.semanas.flatMap(si=>SEMANAS[si].days.map(d=>({si,d})));
+  const totalDias=diasPeriodo.length;
+  const calcFilas=(fg)=>participantes.filter(p=>fg===null||(p.grupo||'')===fg).map(p=>{
+    const presentes=diasPeriodo.filter(({d})=>!noAsiste(p,d)&&asistencia[p.id+'-'+d]).length;
+    const diasAplican=diasPeriodo.filter(({d})=>!noAsiste(p,d)).length;
+    const pct=diasAplican>0?Math.round((presentes/diasAplican)*100):null;
+    return {p,presentes,diasAplican,pct};
+  });
+  const todas=calcFilas(null);
+  const conDias=todas.filter(r=>r.diasAplican>0);
+  const pctG=conDias.length>0?Math.round(conDias.reduce((a,r)=>a+r.pct,0)/conDias.length):0;
+  const tablaG=(grupo,etiqueta)=>{
+    const filas=grupo===null?todas.filter(r=>!r.p.grupo):todas.filter(r=>r.p.grupo===grupo);
+    if(!filas.length)return '';
+    return `<div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:8px">${etiqueta}</div>
+      <table><thead><tr><th>Nombre</th><th class="center">Días</th><th class="center">Presencias</th><th class="center">Ausencias</th><th class="center">% Asistencia</th></tr></thead>
+      <tbody>${filas.map(({p,presentes,diasAplican,pct})=>`<tr>
+        <td style="font-weight:600">${p.nombre}</td>
+        <td class="center" style="color:#888">${diasAplican}</td>
+        <td class="center" style="color:#15803d;font-weight:600">${presentes}</td>
+        <td class="center" style="color:#be123c">${diasAplican-presentes}</td>
+        <td class="center">${pct!==null?`<span style="background:${pctBg(pct)};color:${pctColor(pct)};padding:3px 10px;border-radius:10px;font-weight:700;font-size:12px">${pct}%</span>`:'<span style="color:#ccc">—</span>'}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>`;
+  };
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <h2 style="margin:0">📈 Informe de asistencia</h2>
+        <button class="btn btn-primary" style="background:#5a3e8e" onclick="window.print()">🖨️ Imprimir / PDF</button>
+      </div>
+      <div class="periodo-tabs">
+        ${PERIODOS_INFORME.map(p=>`<button class="periodo-btn" onclick="cambiarPeriodo('${p.key}')" style="background:${informePeriodo===p.key?'#5a3e8e':'#f0f0f0'};color:${informePeriodo===p.key?'#fff':'#555'}">${p.label}</button>`).join('')}
+      </div>
+      <div class="stats-grid" style="margin-bottom:18px">
+        <div class="stat-card" style="background:#EEF2FF"><div class="stat-val" style="color:#5a3e8e">${totalDias}</div><div class="stat-label">Días del período</div></div>
+        <div class="stat-card" style="background:${pctBg(pctG)}"><div class="stat-val" style="color:${pctColor(pctG)}">${pctG}%</div><div class="stat-label">Asistencia media</div></div>
+        <div class="stat-card" style="background:#f0fdf4"><div class="stat-val" style="color:#15803d">${todas.filter(r=>r.pct!==null&&r.pct>=80).length}</div><div class="stat-label">Con +80% asistencia</div></div>
+        <div class="stat-card" style="background:#fff1f2"><div class="stat-val" style="color:#be123c">${todas.filter(r=>r.pct!==null&&r.pct<50).length}</div><div class="stat-label">Con -50% asistencia</div></div>
+      </div>
+      ${tablaG('Peques','🐣 Peques')}
+      ${tablaG('Medios','🧒 Medios')}
+      ${tablaG('Mayores','🧑 Mayores')}
+      ${tablaG(null,'❓ Sin grupo asignado')}
+    </div>`;
+}
+function cambiarPeriodo(key){informePeriodo=key;renderInformes();}
+
+// TABLERO
+function renderTablero() {
+  const acc=rol==='director'?'#5a3e8e':'#0ea5e9';
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <h2>📢 Tablero de avisos</h2>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input type="text" id="nuevo-anuncio" placeholder="Escribe un aviso..." onkeydown="if(event.key==='Enter')addAnuncio()">
+        <button class="btn btn-primary" style="background:${acc};white-space:nowrap" onclick="addAnuncio()">Publicar</button>
+      </div>
+      ${anuncios.map(a=>`<div class="anuncio-item" style="border-left:3px solid ${acc}">
+        <div>
+          <div class="anuncio-meta">${new Date(a.created_at).toLocaleDateString('es-ES')} · ${a.autor}</div>
+          <div style="font-size:13px;color:#333">${a.texto}</div>
+        </div>
+        ${rol==='director'?`<button class="btn-danger" onclick="deleteAnuncio(${a.id})">✕</button>`:''}
+      </div>`).join('')}
+    </div>`;
+}
+async function addAnuncio(){
+  const texto=document.getElementById('nuevo-anuncio').value.trim();
+  if(!texto)return;
+  const autor=rol==='director'?'Director':'Coordinadora';
+  const {data}=await sb.from('anuncios').insert({texto,autor}).select().single();
+  if(data)anuncios.unshift(data);
+  renderTablero();
+}
+async function deleteAnuncio(id){
+  await sb.from('anuncios').delete().eq('id',id);
+  anuncios=anuncios.filter(a=>a.id!==id);
+  renderTablero();
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
