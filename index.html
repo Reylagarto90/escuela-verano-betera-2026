@@ -405,7 +405,7 @@ function renderParticipantes(){
 function crearTablaParticipantes(lista){
   const table=document.createElement('table');
   const thead=document.createElement('thead');
-  thead.innerHTML='<tr><th>#</th><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Período</th><th class="tc">Grupo</th>'+(rol==='director'?'<th class="tc">Ficha</th>':'')+'</tr>';
+  thead.innerHTML='<tr><th>#</th><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>Período</th><th class="tc">Grupo</th><th class="tc">Estado</th>'+(rol==='director'?'<th class="tc">Acciones</th>':'')+'</tr>';
   table.appendChild(thead);
   const tbody=document.createElement('tbody');
   lista.forEach((p,i)=>{
@@ -421,11 +421,34 @@ function crearTablaParticipantes(lista){
       (rol==='director'?'<td class="tc"></td>':'');
     if(rol==='director'){
       const ok=fichas[p.id]?.ficha_completa;
-      const btn=document.createElement('button');
-      btn.className='badge '+(ok?'bg-green':'bg-red');btn.style.border='none';btn.style.cursor='pointer';
-      btn.textContent=ok?'✓ OK':'⚠️ Pendiente';
-      btn.onclick=()=>abrirFicha(p.id);
-      tr.lastChild.appendChild(btn);
+      const tdAcc=tr.lastChild;
+      // Ficha button
+      const btnFicha=document.createElement('button');
+      btnFicha.className='badge '+(ok?'bg-green':'bg-red');btnFicha.style.cssText='border:none;cursor:pointer;margin-right:4px';
+      btnFicha.textContent=ok?'✓ OK':'⚠️ Pendiente';
+      btnFicha.onclick=()=>abrirFicha(p.id);
+      tdAcc.appendChild(btnFicha);
+      // Baja/Activar button
+      if(p.estado==='baja'){
+        const btnAct=document.createElement('button');
+        btnAct.style.cssText='background:#f0fdf4;color:#15803d;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;margin-right:4px';
+        btnAct.textContent='↩️ Activar';
+        btnAct.onclick=()=>cambiarEstadoParticipante(p.id,'activo');
+        tdAcc.appendChild(btnAct);
+      } else {
+        const btnBaja=document.createElement('button');
+        btnBaja.style.cssText='background:#fff1f2;color:#be123c;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;margin-right:4px';
+        btnBaja.textContent='🔴 Baja';
+        btnBaja.onclick=()=>cambiarEstadoParticipante(p.id,'baja');
+        tdAcc.appendChild(btnBaja);
+      }
+      // Eliminar button
+      const btnDel=document.createElement('button');
+      btnDel.style.cssText='background:#f5f5f5;color:#aaa;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600';
+      btnDel.textContent='🗑️';
+      btnDel.title='Eliminar (solo para duplicados o errores)';
+      btnDel.onclick=()=>eliminarParticipante(p.id,p.nombre);
+      tdAcc.appendChild(btnDel);
     }
     tbody.appendChild(tr);
   });
@@ -479,6 +502,27 @@ function mostrarFormNuevo(card){
   btns.appendChild(bGuardar);btns.appendChild(bCancel);f.appendChild(btns);
 }
 
+
+async function cambiarEstadoParticipante(id, estado) {
+  const p = participantes.find(x=>x.id===id);
+  const accion = estado==='baja' ? 'dar de baja a' : 'reactivar a';
+  if(!confirm('¿Confirmas '+accion+' '+(p?.nombre||'este participante')+'?')) return;
+  await sb.from('participantes').update({estado}).eq('id',id);
+  if(p) p.estado = estado;
+  toast(estado==='baja' ? 'Participante dado de baja ✓' : 'Participante reactivado ✓');
+  renderParticipantes();
+}
+
+async function eliminarParticipante(id, nombre) {
+  if(!confirm('⚠️ ¿Eliminar definitivamente a '+nombre+'? Esta acción no se puede deshacer.')) return;
+  if(!confirm('Segunda confirmación: ¿Seguro que quieres eliminar a '+nombre+' y todos sus datos?')) return;
+  await sb.from('participantes').delete().eq('id',id);
+  participantes = participantes.filter(p=>p.id!==id);
+  delete fichas[id];
+  toast('Participante eliminado');
+  renderParticipantes();
+}
+
 async function guardarNuevoParticipante(){
   const nombre=(el('np-nombre')?.value||'').trim();
   const apellidos=(el('np-apellidos')?.value||'').trim();
@@ -498,8 +542,9 @@ async function guardarNuevoParticipante(){
 function renderGrupos(){
   const c=el('main-content');c.innerHTML='';
   const grid=document.createElement('div');grid.className='grupos-grid';
+  const partsActivos = participantes.filter(p=>p.estado!=='baja');
   ['Peques','Medios','Mayores',''].forEach(g=>{
-    const lista=participantes.filter(p=>(p.grupo||'')===g);
+    const lista=partsActivos.filter(p=>(p.grupo||'')===g);
     if(g===''&&lista.length===0)return;
     const card=document.createElement('div');card.className='card';
     const colors={Peques:'#EEF2FF',Medios:'#FFF7ED',Mayores:'#F0FDF4','':'#f8f8f8'};
@@ -569,7 +614,7 @@ function renderAsistencia(){
   const info=document.createElement('p');info.style.cssText='color:#888;font-size:12px;margin-bottom:12px';info.textContent=week.full+' · '+week.dates;
   card.appendChild(info);
 
-  const ninosFiltrados=filtroGrupoAsis==='todos'?participantes:participantes.filter(p=>(p.grupo||'')===filtroGrupoAsis);
+  const ninosFiltrados=(filtroGrupoAsis==='todos'?participantes:participantes.filter(p=>(p.grupo||'')===filtroGrupoAsis)).filter(p=>p.estado!=='baja');
 
   const wrap=document.createElement('div');wrap.style.overflowX='auto';
   const table=document.createElement('table');
