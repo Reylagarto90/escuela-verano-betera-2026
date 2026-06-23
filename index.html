@@ -160,8 +160,8 @@ const PINS = { director: '1234', coordinadora: '0000', monitor: '5500' };
 
 <script>
 const SEMANAS = [
-  { label:'S1', full:'Semana 1', dates:'1–4 jul',   days:['2026-07-01','2026-07-02','2026-07-03','2026-07-04'], labels:['Mié 1','Jue 2','Vie 3','Sáb 4'] },
-  { label:'S2', full:'Semana 2', dates:'7–10 jul',  days:['2026-07-07','2026-07-08','2026-07-09','2026-07-10'], labels:['Mar 7','Mié 8','Jue 9','Vie 10'] },
+  { label:'S1', full:'Semana 1', dates:'1–3 jul',   days:['2026-07-01','2026-07-02','2026-07-03'], labels:['Mié 1','Jue 2','Vie 3'] },
+  { label:'S2', full:'Semana 2', dates:'6–10 jul',  days:['2026-07-06','2026-07-07','2026-07-08','2026-07-09','2026-07-10'], labels:['Lun 6','Mar 7','Mié 8','Jue 9','Vie 10'] },
   { label:'S3', full:'Semana 3', dates:'13–17 jul', days:['2026-07-13','2026-07-14','2026-07-15','2026-07-16','2026-07-17'], labels:['Lun 13','Mar 14','Mié 15','Jue 16','Vie 17'] },
   { label:'S4', full:'Semana 4', dates:'20–24 jul', days:['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24'], labels:['Lun 20','Mar 21','Mié 22','Jue 23','Vie 24'] },
   { label:'S5', full:'Semana 5', dates:'27–31 jul', days:['2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31'], labels:['Lun 27','Mar 28','Mié 29','Jue 30','Vie 31'] },
@@ -177,7 +177,7 @@ const PERIODOS_INFORME = [
   { key:'mes', label:'Mes completo',        semanas:[0,1,2,3,4] },
 ];
 
-let sb, rol, tabActual, semanaActual=0, informePeriodo='mes';
+let sb, rol, tabActual, semanaActual=0, informePeriodo='mes', filtroGrupoAsis='todos';
 let participantes=[], asistencia={}, fichas={}, tareas=[], anuncios=[], formulariosPendientes=[];
 
 async function init() {
@@ -303,7 +303,7 @@ function noAsiste(p, fecha) {
   const t = p.temporalidad;
   const s4dias = ['2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24'];
   const s5dias = SEMANAS[4].days;
-  const jorgedias = ['2026-07-07','2026-07-08','2026-07-09','2026-07-10','2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'];
+  const jorgedias = ['2026-07-06','2026-07-07','2026-07-08','2026-07-09','2026-07-10','2026-07-20','2026-07-21','2026-07-22','2026-07-23','2026-07-24','2026-07-25'];
   if (t==='3 primeras semanas' && (s4dias.includes(fecha)||s5dias.includes(fecha))) return true;
   if (t==='6-10 jul y 20-25 jul' && !jorgedias.includes(fecha)) return true;
   return false;
@@ -462,44 +462,63 @@ async function cambiarGrupo(id,grupo) {
 // ASISTENCIA
 function renderAsistencia() {
   const week = SEMANAS[semanaActual];
-  const acc = rol==='director'?'#5a3e8e':'#0ea5e9';
-  document.getElementById('main-content').innerHTML = `
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-        <h2 style="margin:0">${rol==='director'?'✅ Asistencia':'✅ Pasar lista'}</h2>
-        <div class="semana-tabs">
-          ${SEMANAS.map((s,i)=>`<button class="semana-btn" onclick="cambiarSemana(${i})" style="background:${semanaActual===i?acc:'#f0f0f0'};color:${semanaActual===i?'#fff':'#555'}">${s.label}</button>`).join('')}
-        </div>
-      </div>
-      <p style="color:#888;font-size:12px;margin-bottom:12px">${week.full} · ${week.dates}</p>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr>
-            <th style="min-width:155px">Nombre</th>
-            ${week.labels.map(l=>`<th class="center" style="min-width:44px">${l}</th>`).join('')}
-            <th class="center">∑</th>
-          </tr></thead>
-          <tbody>
-            ${participantes.map(p => {
-              const total = week.days.filter(d=>!noAsiste(p,d)&&asistencia[p.id+'-'+d]).length;
-              return `<tr>
-                <td>
-                  <div style="font-weight:600;font-size:12px">${p.nombre}</div>
-                  <div style="display:flex;gap:4px;margin-top:2px;flex-wrap:wrap">${tempBadge(p.temporalidad)}${p.grupo?grupoBadge(p.grupo):''}</div>
-                </td>
-                ${week.days.map(d=>{
-                  const na=noAsiste(p,d); const pres=asistencia[p.id+'-'+d];
-                  return `<td class="center"><button class="asis-btn ${na?'asis-noaplica':pres?'asis-presente':'asis-ausente'}" ${na?'disabled':''} onclick="toggleAsistencia(${p.id},'${d}')">${na?'–':pres?'✓':''}</button></td>`;
-                }).join('')}
-                <td class="center" style="font-weight:700;font-size:12px;color:${total>0?'#15803d':'#ccc'}">${total}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
+  const acc = rol==='director'?'#5a3e8e':rol==='coordinadora'?'#0ea5e9':'#15803d';
+  const grupos = ['todos','Peques','Medios','Mayores'];
+  const etiquetas = {todos:'👥 Todos', Peques:'🐣 Peques', Medios:'🧒 Medios', Mayores:'🧑 Mayores'};
+
+  const ninosFiltrados = filtroGrupoAsis === 'todos'
+    ? participantes
+    : participantes.filter(p => (p.grupo||'') === filtroGrupoAsis);
+
+  const presentes = ninosFiltrados.filter(p => week.days.some(d => !noAsiste(p,d) && asistencia[p.id+'-'+d])).length;
+
+  let html = '<div class="card">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+  html += '<h2 style="margin:0">' + (rol==='director'?'✅ Asistencia':'✅ Pasar lista') + '</h2>';
+  html += '<div class="semana-tabs">';
+  SEMANAS.forEach((s,i) => {
+    html += '<button class="semana-btn" onclick="cambiarSemana(' + i + ')" style="background:' + (semanaActual===i?acc:'#f0f0f0') + ';color:' + (semanaActual===i?'#fff':'#555') + '">' + s.label + '</button>';
+  });
+  html += '</div></div>';
+
+  // Filtro por grupo (no para monitor)
+  if (rol !== 'monitor') {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+    grupos.forEach(g => {
+      const cnt = g === 'todos' ? participantes.length : participantes.filter(p=>(p.grupo||'')===g).length;
+      html += '<button onclick="filtroGrupoAsis='' + g + '';renderAsistencia()" style="padding:5px 12px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:' + (filtroGrupoAsis===g?acc:'#f0f0f0') + ';color:' + (filtroGrupoAsis===g?'#fff':'#555') + '">' + etiquetas[g] + ' (' + cnt + ')</button>';
+    });
+    html += '</div>';
+  }
+
+  html += '<p style="color:#888;font-size:12px;margin-bottom:8px">' + week.full + ' · ' + week.dates + ' · <strong style="color:' + acc + '">' + presentes + ' presentes hoy</strong></p>';
+  html += '<div style="overflow-x:auto"><table><thead><tr>';
+  html += '<th style="min-width:155px">Nombre</th>';
+  week.labels.forEach(l => { html += '<th class="center" style="min-width:44px">' + l + '</th>'; });
+  html += '<th class="center">∑</th></tr></thead><tbody>';
+
+  ninosFiltrados.forEach(p => {
+    const total = week.days.filter(d=>!noAsiste(p,d)&&asistencia[p.id+'-'+d]).length;
+    html += '<tr><td><div style="font-weight:600;font-size:12px">' + p.nombre + '</div>';
+    html += '<div style="display:flex;gap:4px;margin-top:2px;flex-wrap:wrap">' + tempBadge(p.temporalidad) + (p.grupo?grupoBadge(p.grupo):'') + '</div></td>';
+    week.days.forEach(d => {
+      const na = noAsiste(p,d);
+      const pres = asistencia[p.id+'-'+d];
+      html += '<td class="center"><button class="asis-btn ' + (na?'asis-noaplica':pres?'asis-presente':'asis-ausente') + '" ' + (na?'disabled':'') + ' onclick="toggleAsistencia(' + p.id + ','' + d + '')">' + (na?'–':pres?'✓':'') + '</button></td>';
+    });
+    html += '<td class="center" style="font-weight:700;font-size:12px;color:' + (total>0?'#15803d':'#ccc') + '">' + total + '</td></tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  document.getElementById('main-content').innerHTML = html;
+
 }
 function cambiarSemana(i) { semanaActual=i; renderAsistencia(); }
+function setFiltroGrupo(idx) {
+  const grupos = ['todos','Peques','Medios','Mayores'];
+  filtroGrupoAsis = grupos[idx];
+  renderAsistencia();
+}
 async function toggleAsistencia(pid,fecha) {
   const key = pid+'-'+fecha;
   const actual = asistencia[key]||false;
