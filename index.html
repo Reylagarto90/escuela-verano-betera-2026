@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Escuela de Verano · Bétera 2026</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f6fb;min-height:100vh}
@@ -84,7 +85,16 @@ textarea{resize:vertical}
 .info-box{background:#f0f9ff;border-left:3px solid #0ea5e9;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#0369a1}
 .warn-box{background:#fff7ed;border-left:3px solid #f97316;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#c2410c}
 @media(max-width:600px){.form-row{grid-template-columns:1fr}.content{padding:12px 10px}}
-@media print{.header,#toast,.btn-salir{display:none!important}.content{padding:0}}
+@media print{
+  .header,#toast,.btn-salir,.tabs,.export-bar{display:none!important}
+  .content{padding:0}
+  .no-print{display:none!important}
+  body{background:#fff}
+  .card{box-shadow:none;border:1px solid #eee}
+}
+.export-bar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px;flex-wrap:wrap}
+.btn-export-xl{background:#217346;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.btn-export-pdf{background:#c00;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
 </style>
 </head>
 <body>
@@ -315,6 +325,16 @@ function renderDashboard(){
 
   const c=el('main-content');
   c.innerHTML='';
+
+  // Export all button for director
+  if(rol==='director'){
+    const exportAll=document.createElement('div');exportAll.className='export-bar no-print';exportAll.style.marginBottom='16px';
+    const btnAll=document.createElement('button');btnAll.className='btn-export-xl';
+    btnAll.innerHTML='📊 Exportar todo a Excel';btnAll.onclick=exportarTodoXL;
+    const btnPDF=document.createElement('button');btnPDF.className='btn-export-pdf';
+    btnPDF.innerHTML='🖨️ Imprimir resumen';btnPDF.onclick=()=>window.print();
+    exportAll.appendChild(btnAll);exportAll.appendChild(btnPDF);c.appendChild(exportAll);
+  }
 
   const grid=document.createElement('div');
   grid.className='stats-grid';
@@ -673,6 +693,9 @@ function renderFichas(){
     card.appendChild(d);
   });
   c.appendChild(card);
+  addExportBar(c, 'fichas');
+  addExportBar(c, 'asistencia');
+  addExportBar(c, 'participantes');
 }
 
 function abrirFicha(pid,origen){
@@ -1097,6 +1120,7 @@ function renderAutorizaciones(){
   }
   card.innerHTML+='<p style="font-size:11px;color:#aaa;margin-top:12px">Solo participantes con formulario aprobado ('+aprobados.length+' de '+participantes.length+' total)</p>';
   c.appendChild(card);
+  addExportBar(c, 'autorizaciones');
 }
 
 // ── INCIDENCIAS ────────────────────────────────────────
@@ -1145,6 +1169,7 @@ function renderIncidencias(){
     card.appendChild(div);
   });
   c.appendChild(card);
+  addExportBar(c, 'incidencias');
 }
 
 function mostrarFormIncidencia(card){
@@ -1267,6 +1292,7 @@ function renderComunicados(){
 
   const seccion=document.createElement('div');seccion.id='com-seccion';card.appendChild(seccion);
   c.appendChild(card);
+  addExportBar(c, 'comunicados');
   mostrarSeccionCom('nuevo',card,emailsFam);
 }
 
@@ -1697,6 +1723,213 @@ async function rechazarComunicado(id){
   const nota=el('nota-com-'+id)?.value||'';
   await sb.from('comunicados').update({estado:'rechazado',nota_revision:nota}).eq('id',id);
   toast('Comunicado rechazado');renderPorAprobar();
+}
+
+
+// ── EXPORTAR ───────────────────────────────────────────
+function exportarExcel(datos, nombreArchivo, nombreHoja) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(datos);
+  // Auto column width
+  const cols = Object.keys(datos[0]||{}).map(k => ({wch: Math.max(k.length, 15)}));
+  ws['!cols'] = cols;
+  XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
+  XLSX.writeFile(wb, nombreArchivo + '.xlsx');
+  toast('Excel descargado ✓');
+}
+
+function exportarParticipantesXL() {
+  const datos = participantes.map((p,i) => ({
+    'Nº': i+1,
+    'Nombre': p.nombre,
+    'Contacto': p.contacto||'',
+    'Teléfono': p.telefono||'',
+    'Período': p.temporalidad||'',
+    'Grupo': p.grupo||'Sin asignar',
+    'Estado': p.estado||'activo',
+    'Fecha nacimiento': p.fecha_nac||'',
+    'Nivel educativo': p.nivel_educativo||'',
+    'SIP': p.sip||'',
+  }));
+  exportarExcel(datos, 'participantes-betera-2026', 'Participantes');
+}
+
+function exportarAsistenciaXL() {
+  const filas = [];
+  participantes.forEach(p => {
+    const fila = {'Nombre': p.nombre, 'Grupo': p.grupo||'', 'Período': p.temporalidad};
+    let totalGlobal = 0;
+    SEMANAS.forEach((s,si) => {
+      let totalSemana = 0;
+      s.days.forEach(d => {
+        const pres = !noAsiste(p,d) && !!asistencia[p.id+'-'+d];
+        fila[s.label+' '+d.slice(8)] = noAsiste(p,d) ? 'N/A' : pres ? '✓' : '';
+        if(pres) totalSemana++;
+      });
+      fila['Total '+s.label] = totalSemana;
+      totalGlobal += totalSemana;
+    });
+    fila['TOTAL'] = totalGlobal;
+    filas.push(fila);
+  });
+  exportarExcel(filas, 'asistencia-betera-2026', 'Asistencia');
+}
+
+function exportarFichasXL() {
+  const datos = participantes.map(p => {
+    const f = fichas[p.id]||{};
+    const fam = pendientes.filter(x=>x.participante_id===p.id&&x.estado==='aprobado').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+    return {
+      'Nombre': p.nombre,
+      'Grupo': p.grupo||'',
+      'Fecha nacimiento': p.fecha_nac||'',
+      'Nivel educativo': p.nivel_educativo||'',
+      'SIP': p.sip||'',
+      'Alergias': f.alergias||'',
+      'Medicación': f.medicacion||'',
+      'Observaciones': f.observaciones||'',
+      'Tutor': fam ? (fam.tutor_nombre||'')+' '+(fam.tutor_apellidos||'') : '',
+      'DNI tutor': fam?.tutor_dni||'',
+      'Teléfono tutor': fam?.tutor_telefono||'',
+      'Email tutor': fam?.tutor_email||'',
+      'Ficha completa': f.ficha_completa?'Sí':'No',
+    };
+  });
+  exportarExcel(datos, 'fichas-medicas-betera-2026', 'Fichas Médicas');
+}
+
+function exportarAutorizacionesXL() {
+  const aprobadosTodos = pendientes.filter(f=>f.estado==='aprobado');
+  const aprobados = aprobadosTodos.filter((f,_,arr)=>{
+    const masReciente = arr.filter(x=>x.participante_id===f.participante_id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+    return masReciente.id===f.id;
+  });
+  const datos = aprobados.map(f => {
+    const p = participantes.find(x=>x.id===f.participante_id);
+    return {
+      'Nombre menor': p?.nombre||'—',
+      'Grupo': p?.grupo||'',
+      'Baño piscina': f.bano_piscina?'Sí':'No',
+      'Salidas centro': f.salidas_centro?'Sí':'No',
+      'Fotos RRSS': f.fotos_rrss?'Sí':'No',
+      'Irse solo': f.irse_solo?'Sí':'No',
+      'Urgencias': f.urgencias?'Sí':'No',
+      'Separación/divorcio': f.separacion_divorcio?'Sí':'No',
+      'Custodia': f.prog2_custodia||'',
+      'Autorizado 1': f.autorizado1_nombre||'',
+      'DNI autorizado 1': f.autorizado1_dni||'',
+      'Autorizado 2': f.autorizado2_nombre||'',
+      'DNI autorizado 2': f.autorizado2_dni||'',
+      'Padre': f.padre_nombre||'',
+      'DNI padre': f.padre_dni||'',
+      'Madre': f.madre_nombre||'',
+      'DNI madre': f.madre_dni||'',
+    };
+  });
+  if(datos.length===0){alert('No hay autorizaciones aprobadas aún');return}
+  exportarExcel(datos, 'autorizaciones-betera-2026', 'Autorizaciones');
+}
+
+function exportarIncidenciasXL() {
+  const datos = incidencias.map(inc => {
+    const p = participantes.find(x=>x.id===inc.participante_id);
+    return {
+      'Fecha': new Date(inc.fecha).toLocaleDateString('es-ES'),
+      'Participante': p?.nombre||'General',
+      'Grupo': p?.grupo||'',
+      'Ámbito': inc.ambito||'individual',
+      'Tipo': inc.tipo,
+      'Descripción': inc.descripcion,
+      'Actuación': inc.actuacion||'',
+      'Registrado por': inc.registrado_por,
+      'Estado': inc.estado,
+      'Nota revisión': inc.nota_revision||'',
+    };
+  });
+  if(datos.length===0){alert('No hay incidencias registradas');return}
+  exportarExcel(datos, 'incidencias-betera-2026', 'Incidencias');
+}
+
+function exportarComunicadosXL() {
+  const datos = comunicadosHistorial.filter(c=>c.estado==='aprobado').map(c => ({
+    'Fecha': new Date(c.created_at).toLocaleDateString('es-ES'),
+    'Asunto': c.asunto,
+    'Mensaje': c.mensaje,
+    'Destinatarios': c.destinatarios,
+    'Enviados': c.total_enviados,
+    'Errores': c.errores||0,
+    'Enviado por': c.enviado_por,
+  }));
+  if(datos.length===0){alert('No hay comunicados enviados aún');return}
+  exportarExcel(datos, 'comunicados-betera-2026', 'Comunicados');
+}
+
+function exportarTodoXL() {
+  const wb = XLSX.utils.book_new();
+
+  // Participantes
+  const wsP = XLSX.utils.json_to_sheet(participantes.map((p,i)=>({
+    'Nº':i+1,'Nombre':p.nombre,'Contacto':p.contacto||'','Teléfono':p.telefono||'',
+    'Período':p.temporalidad||'','Grupo':p.grupo||'','Estado':p.estado||'activo'
+  })));
+  XLSX.utils.book_append_sheet(wb, wsP, 'Participantes');
+
+  // Asistencia resumen
+  const wsA = XLSX.utils.json_to_sheet(participantes.map(p => {
+    const fila = {'Nombre':p.nombre,'Grupo':p.grupo||''};
+    let total=0;
+    SEMANAS.forEach((s,si)=>{
+      const pres=s.days.filter(d=>!noAsiste(p,d)&&!!asistencia[p.id+'-'+d]).length;
+      const aplican=s.days.filter(d=>!noAsiste(p,d)).length;
+      fila[s.label]=pres+'/'+aplican;
+      total+=pres;
+    });
+    fila['TOTAL']=total;
+    return fila;
+  }));
+  XLSX.utils.book_append_sheet(wb, wsA, 'Asistencia');
+
+  // Fichas
+  const wsF = XLSX.utils.json_to_sheet(participantes.map(p=>{
+    const f=fichas[p.id]||{};
+    return {'Nombre':p.nombre,'Grupo':p.grupo||'','Alergias':f.alergias||'','Medicación':f.medicacion||'','Observaciones':f.observaciones||''};
+  }));
+  XLSX.utils.book_append_sheet(wb, wsF, 'Fichas Médicas');
+
+  // Autorizaciones
+  const aprobados=pendientes.filter(f=>f.estado==='aprobado');
+  if(aprobados.length>0){
+    const wsAut=XLSX.utils.json_to_sheet(aprobados.map(f=>{
+      const p=participantes.find(x=>x.id===f.participante_id);
+      return {'Nombre':p?.nombre||'—','Piscina':f.bano_piscina?'Sí':'No','Salidas':f.salidas_centro?'Sí':'No','Fotos':f.fotos_rrss?'Sí':'No','Solo':f.irse_solo?'Sí':'No','Urgencias':f.urgencias?'Sí':'No'};
+    }));
+    XLSX.utils.book_append_sheet(wb, wsAut, 'Autorizaciones');
+  }
+
+  XLSX.writeFile(wb, 'escuela-verano-betera-2026-completo.xlsx');
+  toast('Excel completo descargado ✓');
+}
+
+function addExportBar(container, tipo) {
+  if(rol!=='director')return;
+  const bar=document.createElement('div');bar.className='export-bar no-print';
+  const btnXL=document.createElement('button');btnXL.className='btn-export-xl';
+  btnXL.innerHTML='📊 Excel';
+  const btnPDF=document.createElement('button');btnPDF.className='btn-export-pdf';
+  btnPDF.innerHTML='🖨️ PDF';
+  btnPDF.onclick=()=>window.print();
+  const exportMap={
+    participantes:exportarParticipantesXL,
+    asistencia:exportarAsistenciaXL,
+    fichas:exportarFichasXL,
+    autorizaciones:exportarAutorizacionesXL,
+    incidencias:exportarIncidenciasXL,
+    comunicados:exportarComunicadosXL,
+    todo:exportarTodoXL,
+  };
+  btnXL.onclick=exportMap[tipo]||exportMap.todo;
+  bar.appendChild(btnXL);bar.appendChild(btnPDF);
+  container.insertBefore(bar,container.firstChild);
 }
 
 window.onload=init;
