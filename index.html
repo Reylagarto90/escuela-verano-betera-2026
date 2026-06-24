@@ -1083,16 +1083,17 @@ function renderAutorizaciones(){
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);wrap.appendChild(table);card.appendChild(wrap);
-    // Event delegation for nombre links
-    wrap.addEventListener('click', function(e){
-      const td = e.target.closest('.aut-nombre-link');
-      if(td){
-        const pid = parseInt(td.getAttribute('data-pid'));
-        tabActual='fichas';
-        abrirFicha(pid,'autorizaciones');
-        window.scrollTo(0,0);
-      }
-    });
+    // Direct onclick for nombre links after render
+    setTimeout(function(){
+      document.querySelectorAll('.aut-nombre-link').forEach(function(td){
+        td.onclick = function(){
+          const pid = parseInt(this.getAttribute('data-pid'));
+          tabActual='fichas';
+          abrirFicha(pid,'autorizaciones');
+          window.scrollTo(0,0);
+        };
+      });
+    }, 50);
   }
   card.innerHTML+='<p style="font-size:11px;color:#aaa;margin-top:12px">Solo participantes con formulario aprobado ('+aprobados.length+' de '+participantes.length+' total)</p>';
   c.appendChild(card);
