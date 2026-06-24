@@ -1074,7 +1074,8 @@ function renderAutorizaciones(){
       const tr=document.createElement('tr');
       const tdName=document.createElement('td');tdName.style.cssText='font-weight:600;cursor:pointer;color:#5a3e8e';
       tdName.textContent=(p?p.nombre:'—')+(f.separacion_divorcio?' ⚠️':'');
-      tdName.onclick=()=>{tabActual='fichas';abrirFicha(f.participante_id,'autorizaciones');window.scrollTo(0,0);};
+      tdName.setAttribute('data-pid', f.participante_id);
+      tdName.className='aut-nombre-link';
       tr.appendChild(tdName);
       [f.bano_piscina,f.salidas_centro,f.fotos_rrss,f.irse_solo,f.urgencias,f.separacion_divorcio].forEach(v=>{
         const td=document.createElement('td');td.className='tc';td.innerHTML=badgeAut(v);tr.appendChild(td);
@@ -1082,6 +1083,16 @@ function renderAutorizaciones(){
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);wrap.appendChild(table);card.appendChild(wrap);
+    // Event delegation for nombre links
+    wrap.addEventListener('click', function(e){
+      const td = e.target.closest('.aut-nombre-link');
+      if(td){
+        const pid = parseInt(td.getAttribute('data-pid'));
+        tabActual='fichas';
+        abrirFicha(pid,'autorizaciones');
+        window.scrollTo(0,0);
+      }
+    });
   }
   card.innerHTML+='<p style="font-size:11px;color:#aaa;margin-top:12px">Solo participantes con formulario aprobado ('+aprobados.length+' de '+participantes.length+' total)</p>';
   c.appendChild(card);
