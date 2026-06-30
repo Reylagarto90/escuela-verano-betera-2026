@@ -134,6 +134,10 @@ textarea{resize:vertical}
         <button class="btn-salir" onclick="cerrarSesion()">Salir</button>
       </div>
       <div class="tabs" id="tabs-container"></div>
+      <div style="position:relative;margin-top:8px" class="no-print">
+        <input type="text" id="buscador-global" placeholder="🔍 Buscar participante..." style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:none;font-size:13px;background:rgba(255,255,255,.95)" oninput="buscadorGlobal(this.value)" onfocus="if(this.value)buscadorGlobal(this.value)">
+        <div id="buscador-resultados" style="display:none;position:absolute;top:38px;left:0;width:100%;max-width:320px;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:280px;overflow-y:auto;z-index:50"></div>
+      </div>
     </div>
   </div>
   <div class="content" id="main-content"></div>
@@ -815,6 +819,31 @@ function abrirFicha(pid,origen){
     const bC=document.createElement('button');bC.className='btn btn-ghost';bC.textContent='Cancelar';bC.onclick=volver;
     btns.appendChild(bG);btns.appendChild(bC);card.appendChild(btns);
   }
+
+  // Resumen de asistencia del menor
+  const secAsis=document.createElement('div');secAsis.style.cssText='background:#f0f9ff;border-radius:12px;padding:16px;margin-top:16px;border:1px solid #bae6fd';
+  secAsis.innerHTML='<h3 style="margin:0 0 12px;font-size:14px;color:#0369a1">📊 Asistencia</h3>';
+  let totalPres=0, totalDias=0;
+  const asisGrid=document.createElement('div');asisGrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:10px';
+  SEMANAS.forEach(s=>{
+    const diasAplican=s.days.filter(d=>!noAsiste(p,d));
+    const presentes=diasAplican.filter(d=>!!asistencia[p.id+'-'+d]).length;
+    totalPres+=presentes;totalDias+=diasAplican.length;
+    const pct=diasAplican.length>0?Math.round((presentes/diasAplican.length)*100):null;
+    const box=document.createElement('div');box.style.cssText='background:#fff;border-radius:8px;padding:8px;text-align:center';
+    box.innerHTML='<div style="font-size:10px;color:#888;margin-bottom:2px">'+s.label+'</div>'+
+      (diasAplican.length>0
+        ? '<div style="font-weight:700;font-size:13px;color:'+pctColor(pct)+'">'+presentes+'/'+diasAplican.length+'</div>'
+        : '<div style="font-size:11px;color:#ccc">N/A</div>');
+    asisGrid.appendChild(box);
+  });
+  secAsis.appendChild(asisGrid);
+  const pctTotal=totalDias>0?Math.round((totalPres/totalDias)*100):null;
+  const resumen=document.createElement('div');resumen.style.cssText='display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 14px';
+  resumen.innerHTML='<span style="font-size:13px;color:#555">Total: <strong>'+totalPres+'/'+totalDias+'</strong> días</span>'+
+    (pctTotal!==null?'<span style="margin-left:auto;background:'+pctBg(pctTotal)+';color:'+pctColor(pctTotal)+';padding:4px 12px;border-radius:10px;font-weight:700;font-size:13px">'+pctTotal+'%</span>':'');
+  secAsis.appendChild(resumen);
+  card.appendChild(secAsis);
 
   // Notas internas del equipo
   const secNotas=document.createElement('div');secNotas.style.cssText='background:#fffbe6;border-radius:12px;padding:16px;margin-top:16px;border:1px solid #fde68a';
@@ -1970,6 +1999,43 @@ function addExportBar(container, tipo) {
   bar.appendChild(btnXL);bar.appendChild(btnPDF);
   container.insertBefore(bar,container.firstChild);
 }
+
+
+function buscadorGlobal(q) {
+  const cont = el('buscador-resultados');
+  if (!q || q.trim().length < 2) { cont.style.display = 'none'; return; }
+  const resultados = participantes.filter(p => p.nombre.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  if (resultados.length === 0) {
+    cont.innerHTML = '<div style="padding:12px;color:#aaa;font-size:13px">Sin resultados</div>';
+    cont.style.display = 'block';
+    return;
+  }
+  cont.innerHTML = '';
+  resultados.forEach(p => {
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px;display:flex;justify-content:space-between;align-items:center';
+    item.onmouseover = () => item.style.background = '#f8f9ff';
+    item.onmouseout = () => item.style.background = '#fff';
+    const estadoTag = p.estado==='baja' ? ' <span style="color:#be123c;font-size:11px">(baja)</span>' : '';
+    item.innerHTML = '<span style="font-weight:600">' + p.nombre + estadoTag + '</span>' + (p.grupo ? grupoBadge(p.grupo) : '');
+    item.onclick = () => {
+      el('buscador-global').value = '';
+      cont.style.display = 'none';
+      tabActual = 'fichas';
+      abrirFicha(p.id, null);
+      window.scrollTo(0,0);
+    };
+    cont.appendChild(item);
+  });
+  cont.style.display = 'block';
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#buscador-global') && !e.target.closest('#buscador-resultados')) {
+    const cont = el('buscador-resultados');
+    if (cont) cont.style.display = 'none';
+  }
+});
 
 window.onload=init;
 </script>
