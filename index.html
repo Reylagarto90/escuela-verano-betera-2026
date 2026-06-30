@@ -316,10 +316,11 @@ function mostrarTab(k){
 
 // ── DASHBOARD ──────────────────────────────────────────
 function renderDashboard(){
-  const fichasOk=participantes.filter(p=>fichas[p.id]?.ficha_completa).length;
+  const activos=participantes.filter(p=>p.estado!=='baja');
+  const fichasOk=activos.filter(p=>fichas[p.id]?.ficha_completa).length;
   const tHechas=tareas.filter(t=>t.hecha).length;
   const urgentes=tareas.filter(t=>!t.hecha&&t.prioridad==='alta');
-  const fichasPend=participantes.filter(p=>!fichas[p.id]?.ficha_completa);
+  const fichasPend=participantes.filter(p=>p.estado!=='baja'&&!fichas[p.id]?.ficha_completa);
   const formPend=pendientes.filter(f=>f.estado==='pendiente').length;
   const incPend=incidencias.filter(i=>i.estado==='pendiente').length;
 
@@ -340,7 +341,7 @@ function renderDashboard(){
   grid.className='stats-grid';
   [
     {i:'👦',v:participantes.length,l:'Participantes',bg:'#EEF2FF',co:'#5a3e8e',k:null},
-    {i:'🏥',v:fichasOk+'/'+participantes.length,l:'Fichas completas',bg:'#f0fdf4',co:'#15803d',k:'fichas'},
+    {i:'🏥',v:fichasOk+'/'+activos.length,l:'Fichas completas',bg:'#f0fdf4',co:'#15803d',k:'fichas'},
     {i:'📋',v:tHechas+'/'+tareas.length,l:'Tareas hechas',bg:'#fff7ed',co:'#c2410c',k:'tareas'},
     {i:'🚨',v:urgentes.length,l:'Tareas urgentes',bg:'#fff1f2',co:'#be123c',k:'tareas'},
     {i:'⏳',v:formPend+incPend,l:'Por aprobar',bg:'#fff7ed',co:'#c2410c',k:'por_aprobar'},
@@ -579,7 +580,7 @@ function renderGrupos(){
       const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06)';
       const name=document.createElement('span');name.style.cssText='font-size:13px;font-weight:600';name.textContent=p.nombre;
       row.appendChild(name);
-      if(rol==='director'){
+      if(rol==='director'||rol==='coordinadora'){
         const sel=document.createElement('select');sel.style.cssText='font-size:11px;padding:3px 6px;border:1px solid #e0e0e0;border-radius:6px;width:auto';
         ['','Peques','Medios','Mayores'].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v||'Sin grupo';if(p.grupo===v)o.selected=true;sel.appendChild(o)});
         sel.onchange=()=>cambiarGrupo(p.id,sel.value);
@@ -676,7 +677,8 @@ async function toggleAsistencia(pid,fecha){
 
 // ── FICHAS ─────────────────────────────────────────────
 function renderFichas(){
-  const total=participantes.length;const ok=participantes.filter(p=>fichas[p.id]?.ficha_completa).length;
+  const activosList=participantes.filter(p=>p.estado!=='baja');
+  const total=activosList.length;const ok=activosList.filter(p=>fichas[p.id]?.ficha_completa).length;
   const c=el('main-content');c.innerHTML='';
   const card=document.createElement('div');card.className='card';
   const hdr=document.createElement('div');hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';
@@ -685,7 +687,7 @@ function renderFichas(){
   const pb=document.createElement('div');pb.className='progress-bar';
   const pf=document.createElement('div');pf.className='progress-fill';pf.style.width=((ok/total)*100)+'%';
   pb.appendChild(pf);card.appendChild(pb);
-  participantes.forEach(p=>{
+  activosList.forEach(p=>{
     const o=fichas[p.id]?.ficha_completa;
     const d=document.createElement('div');d.className='ficha-item '+(o?'ficha-ok':'ficha-pend');d.onclick=()=>abrirFicha(p.id);
     d.innerHTML='<div><div style="font-weight:600;font-size:13px">'+p.nombre+'</div><div style="font-size:11px;color:#888">'+(p.contacto||'')+'·'+(p.telefono||'')+' '+grupoBadge(p.grupo)+'</div></div>'+
@@ -814,6 +816,28 @@ function abrirFicha(pid,origen){
     btns.appendChild(bG);btns.appendChild(bC);card.appendChild(btns);
   }
 
+  // Notas internas del equipo
+  const secNotas=document.createElement('div');secNotas.style.cssText='background:#fffbe6;border-radius:12px;padding:16px;margin-top:16px;border:1px solid #fde68a';
+  secNotas.innerHTML='<h3 style="margin:0 0 10px;font-size:14px;color:#a16207">📝 Notas internas del equipo</h3>';
+  const notasTexto=f.notas_internas||'';
+  if(notasTexto){
+    const notasDiv=document.createElement('div');notasDiv.style.cssText='background:#fff;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#555;white-space:pre-wrap;max-height:200px;overflow-y:auto';
+    notasDiv.textContent=notasTexto;
+    secNotas.appendChild(notasDiv);
+  } else {
+    const vacio=document.createElement('p');vacio.style.cssText='color:#aaa;font-size:12px;margin-bottom:10px';vacio.textContent='Sin notas internas aún';
+    secNotas.appendChild(vacio);
+  }
+  if(!esRO){
+    const notaRow=document.createElement('div');notaRow.style.cssText='display:flex;gap:8px';
+    const notaInput=document.createElement('input');notaInput.type='text';notaInput.id='nueva-nota';notaInput.placeholder='Añadir nota interna (no afecta al estado de la ficha)...';notaInput.style.flex='1';
+    notaInput.onkeydown=e=>{if(e.key==='Enter')agregarNotaInterna(pid,volver)};
+    const notaBtn=document.createElement('button');notaBtn.className='btn btn-primary';notaBtn.style.background='#a16207';notaBtn.textContent='+ Añadir';
+    notaBtn.onclick=()=>agregarNotaInterna(pid,volver);
+    notaRow.appendChild(notaInput);notaRow.appendChild(notaBtn);secNotas.appendChild(notaRow);
+  }
+  card.appendChild(secNotas);
+
   // Incidencias del menor
   if(incP.length>0){
     const sec=document.createElement('div');sec.style.cssText='margin-top:16px';
@@ -842,7 +866,7 @@ async function guardarFicha(pid,volver){
   const alergias=el('f-alergias')?.value||'';
   const medicacion=el('f-medicacion')?.value||'';
   const observaciones=el('f-observaciones')?.value||'';
-  const fichaCompleta=!!(alergias||medicacion||observaciones||fechaNac);
+  const fichaCompleta=fichas[pid]?.ficha_completa||false; // Solo se marca al aprobar el formulario de la familia
   await Promise.all([
     sb.from('participantes').update({fecha_nac:fechaNac||null,grupo}).eq('id',pid),
     sb.from('fichas').update({alergias,medicacion,observaciones,ficha_completa:fichaCompleta,updated_at:new Date().toISOString()}).eq('participante_id',pid),
@@ -850,6 +874,21 @@ async function guardarFicha(pid,volver){
   const p=participantes.find(x=>x.id===pid);if(p){p.fecha_nac=fechaNac;p.grupo=grupo}
   if(fichas[pid])fichas[pid]={...fichas[pid],alergias,medicacion,observaciones,ficha_completa:fichaCompleta};
   toast('Ficha guardada ✓');volver();
+}
+
+async function agregarNotaInterna(pid,volver){
+  const texto=(el('nueva-nota')?.value||'').trim();
+  if(!texto){alert('Escribe una nota');return}
+  const autor=rol==='director'?'Director':rol==='coordinadora'?'Coordinadora':'Monitor';
+  const notaActual=fichas[pid]?.notas_internas||'';
+  const fecha=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const nuevaEntrada='['+fecha+' · '+autor+'] '+texto;
+  const notasActualizadas=notaActual?notaActual+'\n\n'+nuevaEntrada:nuevaEntrada;
+  await sb.from('fichas').update({notas_internas:notasActualizadas}).eq('participante_id',pid);
+  if(fichas[pid])fichas[pid].notas_internas=notasActualizadas;
+  else fichas[pid]={notas_internas:notasActualizadas};
+  toast('Nota añadida ✓');
+  abrirFicha(pid,null);
 }
 
 // ── TAREAS ─────────────────────────────────────────────
